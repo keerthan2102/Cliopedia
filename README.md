@@ -90,7 +90,7 @@ client, no backend-specific branching.
 ## Source material
 
 **[OpenStax *U.S. History*](https://openstax.org/details/books/us-history)** —
-licensed **CC BY 4.0**, peer-reviewed and actively maintained.
+licensed **CC BY-NC-SA 4.0**, peer-reviewed and actively maintained.
 
 Chosen deliberately over Project Gutenberg. US public domain means *published
 before 1929*, so any history book old enough to be public domain carries roughly
@@ -103,8 +103,18 @@ sources** (period documents to analyse critically), clearly labelled and
 distinguished from the textbook.
 
 > *U.S. History* by OpenStax is licensed under
-> [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The OpenStax name,
-> logo, and cover art are not covered by that licence.
+> [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The
+> OpenStax name, logo, and cover art are not covered by that licence.
+
+Two consequences of the **NC** and **SA** terms, stated plainly because they
+constrain the project rather than merely decorate it:
+
+- **NonCommercial.** Cliopedia is a non-commercial open-source study tool and
+  must stay one. The deployed demo carries no ads, no paywall, no paid tier.
+- **ShareAlike.** The committed Chroma index in `data/chroma/` contains verbatim
+  passages from the textbook, so that index is redistributed under
+  CC BY-NC-SA 4.0 — not under this repository's code licence. See
+  [Licence](#licence) below for the split.
 
 ---
 
@@ -163,5 +173,18 @@ This repo follows a six-file working system:
 
 ## Licence
 
-Code: see [`LICENSE`](LICENSE).
-Source material: OpenStax *U.S. History*, CC BY 4.0, attributed above.
+This repository is licensed in two parts, because the code and the corpus come
+from different places and cannot share one licence.
+
+| What | Licence |
+|---|---|
+| Everything written for this project — `cliopedia/`, `scripts/`, `tests/`, `app.py`, docs | MIT — see [`LICENSE`](LICENSE) |
+| The built index in `data/chroma/`, which embeds verbatim textbook passages | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), inherited from the source |
+
+Source material: OpenStax *U.S. History*, CC BY-NC-SA 4.0, attributed above.
+The ShareAlike term travels with the passages, so the index cannot be
+relicensed under MIT. Nothing in `data/raw/` is redistributed here at all — it
+is git-ignored and refetched by `scripts/download_sources.py`.
+
+*Not legal advice.* This is a good-faith reading of the licence terms by the
+author, not a lawyer's opinion.

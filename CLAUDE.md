@@ -44,7 +44,7 @@ then use it anyway unless told otherwise in the current message.
 | UI | Streamlit → Streamlit Community Cloud |
 | PDF loading | `pypdf` via LangChain's `PyPDFLoader` |
 | Tests | `pytest` |
-| Corpus | OpenStax *U.S. History*, CC BY 4.0 |
+| Corpus | OpenStax *U.S. History*, CC BY-NC-SA 4.0 (see §8 Rule 3) |
 
 ---
 
@@ -145,9 +145,16 @@ that silently destroys the grounding guarantee the whole project rests on.
 
 - **Commits:** Conventional Commits — `feat:`, `fix:`, `docs:`, `chore:`,
   `refactor:`, `test:`.
-- **Branching:** commit directly to `main` and push after each completed and
-  explained step. **No feature branches on this project — deliberate, not an
-  oversight.** Do not set up a `PreToolUse` branch-guard hook.
+- **Branching: `main` is the trunk, and all work lands there.** Commit directly
+  to `main` and push after each completed and explained step. **No feature
+  branches by choice — deliberate, not an oversight.** Do not set up a
+  `PreToolUse` branch-guard hook.
+  - **When a harness forces work onto a branch** (some Claude Code environments
+    mandate one and refuse pushes to `main`), that is not a reason to abandon
+    the rule. Open a **pull request into `main` and merge it** before the
+    session ends. Work must never be left stranded on a branch — a branch
+    nobody merges is work nobody has.
+  - Never leave a stale branch behind on `origin` after its PR merges.
 - **Package name is `cliopedia/`, never `lib/`.** The seeded Python
   `.gitignore` contains `lib/` and `lib64/`; a source folder named `lib/` would
   be **silently untracked**. Sidestep by name; do not edit the ignore rule.
@@ -178,9 +185,13 @@ rewriting history *and* rotating the credential.
 - **Extend `.gitignore`, never remove seeded entries.**
 - `.claude/soul.md` is git-ignored — it contains personal data. The rest of
   `.claude/` is tracked on purpose.
-- Attribution to OpenStax (CC BY 4.0) in README and UI is a **licence
-  obligation**, not a courtesy. The OpenStax name, logo, and cover art are not
-  covered by the licence and must not be reproduced.
+- Attribution to OpenStax (**CC BY-NC-SA 4.0** — see §8 Rule 3) in README and UI
+  is a **licence obligation**, not a courtesy. A *wrong* attribution is a
+  violation, not a typo. The OpenStax name, logo, and cover art are not covered
+  by the licence and must not be reproduced.
+- **ShareAlike travels with the passages.** `data/chroma/` embeds verbatim
+  textbook text, so it ships under CC BY-NC-SA 4.0, not under the repo's MIT
+  `LICENSE`. Never relicense the index. Never make the deployed demo commercial.
 
 ---
 
@@ -270,4 +281,29 @@ Format:
   from the commit that caused it.
 - **Correct behavior**: run `pip install --dry-run -r requirements.txt` and
   confirm it exits 0 before committing any change to `requirements.txt`.
+- **Date**: 2026-07-29
+
+### Rule 3: never state a licence you have not read from the source
+
+- **Trigger**: `SPEC.md` §3, README, and §6 above all asserted OpenStax
+  *U.S. History* is **CC BY 4.0**. It is not. It is **CC BY-NC-SA 4.0**. The
+  claim came from search summaries and third-party listings — "OpenStax is
+  CC BY 4.0" is true of *many* OpenStax books but not this one, and the
+  generalisation was repeated as fact across three files. Attribution is a
+  licence obligation, so a wrong attribution is a licence violation, not a typo.
+- **Correct behavior**: read the licence from a source the rights-holder
+  controls before writing it anywhere. Confirmed here from OpenStax's own
+  repository, `openstax/osbooks-us-history`, in two independent places:
+
+  - `collections/us-history.collection.xml` →
+    `<md:license url="http://creativecommons.org/licenses/by-nc-sa/4.0/">`
+    (collection `col11740`, uuid `a7ba2fb8-8925-4987-b182-5f4429d48daa`)
+  - the repository's own `LICENSE` file and `README.md`
+
+  Consequences that follow, and must not be quietly dropped: **NC** means the
+  project stays non-commercial — no ads, no paid tier on the deployed demo.
+  **SA** means the committed index in `data/chroma/`, which carries verbatim
+  passages, is redistributed under CC BY-NC-SA 4.0 and **cannot** be covered by
+  this repo's MIT `LICENSE`. README documents the split. `SPEC.md` is read-only
+  and still says CC BY 4.0; this rule is the correction of record.
 - **Date**: 2026-07-29
