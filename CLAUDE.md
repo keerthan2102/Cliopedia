@@ -240,4 +240,34 @@ Format:
 - **Date**: YYYY-MM-DD
 -->
 
-*(empty — rules get added as they're learned)*
+### Rule 1: LangChain 1.x is several packages, and `langchain` isn't one of ours
+
+- **Trigger**: §2 above and `SPEC.md` name "LangChain" as if it were one
+  dependency. As of 1.x it is not, and the planned dependency list was wrong —
+  it omitted `langchain-huggingface` entirely, so `HuggingFaceEmbeddings` would
+  have failed to import at ingest time.
+- **Correct behavior**: install only the packages we import from —
+
+  | Import | Package |
+  |---|---|
+  | `PyPDFLoader` | `langchain-community` |
+  | `RecursiveCharacterTextSplitter` | `langchain-text-splitters` |
+  | `Chroma` | `langchain-chroma` |
+  | `HuggingFaceEmbeddings` | `langchain-huggingface` |
+
+  The `langchain` meta-package is **deliberately not installed**: in 1.x it is
+  `langchain-core` plus LangGraph, neither of which the thin usage in §4.1
+  touches, and both are weight on a deploy target whose limits are unverified
+  (`SPEC.md` §2.2). Corollary: any tutorial doing
+  `from langchain.text_splitter import ...` is pre-1.x and stale — the import
+  path moved.
+- **Date**: 2026-07-29
+
+### Rule 2: verify a pin set resolves before committing it
+
+- **Trigger**: `requirements.txt` uses exact `==` pins, and a pinned set that
+  cannot co-install fails on Streamlit Cloud rather than on the laptop — far
+  from the commit that caused it.
+- **Correct behavior**: run `pip install --dry-run -r requirements.txt` and
+  confirm it exits 0 before committing any change to `requirements.txt`.
+- **Date**: 2026-07-29
