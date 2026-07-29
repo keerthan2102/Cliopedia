@@ -219,3 +219,14 @@ __marimo__/
 
 # Cliopedia — personal layer (contains PII, keep out of the public repo)
 .claude/soul.md
+
+# Cliopedia — source documents are refetched, never committed (SPEC.md §4.1).
+# Nothing at query time opens these: citation snippets live in the index
+# metadata, so the original PDF is never read after ingest. Committing a
+# ~60MB textbook would sit in Git history forever for no benefit.
+# scripts/download_sources.py makes them reproducible.
+data/raw/
+
+# NOTE: data/chroma/ is deliberately NOT ignored. The built index is a
+# committed build artifact — Streamlit Community Cloud gives us no database,
+# so the deployed app ships a prebuilt index and only ever reads it.
