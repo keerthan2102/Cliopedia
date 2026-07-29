@@ -123,12 +123,39 @@ constrain the project rather than merely decorate it:
 > Not yet runnable. These are the target commands from [`SPEC.md`](SPEC.md) and
 > will be verified as each phase ships.
 
-```bash
-python -m venv venv
-source venv/bin/activate           # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+**1. Create and activate the virtual environment.** This is the only step that
+differs by platform — pick the one line that matches your shell.
 
-cp .env.example .env               # fill in local values; never commit .env
+```bat
+:: Windows, Command Prompt
+python -m venv venv
+venv\Scripts\activate
+```
+
+```powershell
+# Windows, PowerShell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+```bash
+# macOS / Linux
+python -m venv venv
+source venv/bin/activate
+```
+
+Your prompt gains a `(venv)` prefix once it works. If PowerShell refuses with
+"running scripts is disabled", `Set-ExecutionPolicy -Scope Process
+-ExecutionPolicy Bypass` allows it for that window only.
+
+**2. Everything after that is identical on all platforms**, except copying the
+env file:
+
+```bash
+pip install -r requirements.txt    # pulls PyTorch — a few hundred MB
+
+cp .env.example .env               # Windows: copy .env.example .env
+                                   # fill in local values; never commit .env
 
 ollama pull llama3.1:8b            # local model for development
 ollama serve

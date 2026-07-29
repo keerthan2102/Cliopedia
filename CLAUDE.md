@@ -55,11 +55,14 @@ then use it anyway unless told otherwise in the current message.
 > run.
 
 ```bash
-# Setup
+# Setup — activation is the one platform-specific line.
+# The author develops on Windows; do not hand them a bare `source` line.
 python -m venv venv
-source venv/bin/activate           # Windows: venv\Scripts\activate
+venv\Scripts\activate              # Windows CMD
+.\venv\Scripts\Activate.ps1        # Windows PowerShell
+source venv/bin/activate           # macOS / Linux
 pip install -r requirements.txt
-cp .env.example .env               # then fill in local values
+cp .env.example .env               # Windows: copy .env.example .env
 
 # Local model (dev)
 ollama pull llama3.1:8b
@@ -310,4 +313,21 @@ Format:
   passages, is redistributed under CC BY-NC-SA 4.0 and **cannot** be covered by
   this repo's MIT `LICENSE`. README documents the split. `SPEC.md` is read-only
   and still says CC BY 4.0; this rule is the correction of record.
+- **Date**: 2026-07-29
+
+### Rule 4: the author develops on Windows — never hand over a bare `source` line
+
+- **Trigger**: setup instructions were given as a Unix block with the Windows
+  variant demoted to a trailing comment —
+  `source venv/bin/activate  # Windows: venv\Scripts\activate`. That reads as
+  one command with an aside, not as two alternatives, and `source` does not
+  exist in Command Prompt at all. The author had to stop and ask.
+- **Correct behavior**: when a command differs by platform, give the Windows
+  form as a **first-class, separately labelled block**, not a comment. Applies
+  to venv activation (`venv\Scripts\activate` for CMD,
+  `.\venv\Scripts\Activate.ps1` for PowerShell) and to `cp` → `copy`. Path
+  separators need no special handling: Python normalises `scripts/x.py` fine on
+  Windows. Worth volunteering unprompted: PowerShell blocks `Activate.ps1` under
+  the default execution policy, and a bare `python` can resolve to the Microsoft
+  Store stub — `py -3.11` is the more reliable launcher there.
 - **Date**: 2026-07-29
