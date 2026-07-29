@@ -331,3 +331,15 @@ Format:
   the default execution policy, and a bare `python` can resolve to the Microsoft
   Store stub — `py -3.11` is the more reliable launcher there.
 - **Date**: 2026-07-29
+
+### Rule 5: never put backticks in a double-quoted `git commit -m` string
+
+- **Trigger**: a commit body written as `-m "... `source` does not exist ..."`
+  lost the word entirely. Backticks inside double quotes are command
+  substitution in bash, so the shell ran `source` and pasted its (empty) output
+  into the message. The commit looked fine until it was read back.
+- **Correct behavior**: write commit bodies without backticks, or pass them via
+  `git commit -F <file>` / a quoted heredoc. Markdown formatting in a commit
+  message buys nothing — Git renders it as plain text. Always read the message
+  back with `git log -1 --format=%B` after committing.
+- **Date**: 2026-07-29
