@@ -29,12 +29,8 @@ RAW_DIR = REPO_ROOT / "data" / "raw"
 
 # The OpenStax U.S. History PDF.
 #
-# UNVERIFIED. This URL could not be reached from the environment this script was
-# written in — the network policy there blocks openstax.org outright — so it has
-# never been confirmed to resolve. It is a best guess at OpenStax's asset naming,
-# not a checked fact.
-#
-# If it 404s, get the real link from the book's page and pass it with --url:
+# Verified working on 2026-07-29: serves a 324 MB print-quality PDF. If it ever
+# 404s, get the current link from the book's page and pass it with --url:
 #     https://openstax.org/details/books/us-history
 # then correct the constant below in the same commit that records the fix.
 DEFAULT_URL = "https://assets.openstax.org/oscms-prodcms/media/documents/USHistory-OP.pdf"
@@ -78,15 +74,30 @@ def download(url: str, dest: Path) -> None:
         partial.unlink(missing_ok=True)
         raise SystemExit(
             f"\nHTTP {exc.code} fetching {url}\n\n"
-            "The default URL in this script is explicitly unverified. Find the\n"
-            "current PDF link on https://openstax.org/details/books/us-history\n"
-            "and re-run with --url <link>, then fix DEFAULT_URL in this file."
+            "If OpenStax has moved the file, find the current PDF link on\n"
+            "https://openstax.org/details/books/us-history and re-run with\n"
+            "--url <link>, then fix DEFAULT_URL in this file."
         ) from exc
     except urllib.error.URLError as exc:
         partial.unlink(missing_ok=True)
         raise SystemExit(f"\nCould not reach {url}: {exc.reason}") from exc
 
     print()
+
+    # The byte count is compared, not just displayed. urllib's read loop ends on
+    # an empty read, and a connection that drops mid-transfer produces exactly
+    # that — so a truncated download exits the loop looking like a clean finish.
+    # The progress line is rounded to 0.1 MB, which hides a shortfall of tens of
+    # thousands of bytes. Only an exact comparison catches it.
+    if total is not None and written != total:
+        partial.unlink(missing_ok=True)
+        raise SystemExit(
+            f"Truncated download: got {written:,} bytes, server declared {total:,} "
+            f"({total - written:,} short).\n"
+            "Deleted the partial file. Re-run to try again — a download this size\n"
+            "over a flaky connection often needs more than one attempt."
+        )
+
     partial.replace(dest)
 
 
@@ -130,9 +141,19 @@ def report(path: Path) -> None:
         )
         return
 
-    reader = PdfReader(str(path))
+    size = path.stat().st_size
+    try:
+        reader = PdfReader(str(path))
+    except Exception as exc:  # pypdf raises several unrelated types on damage
+        raise SystemExit(
+            f"\n{path.relative_to(REPO_ROOT)} is {size:,} bytes but pypdf cannot\n"
+            f"read it: {type(exc).__name__}: {exc}\n\n"
+            "A PDF that starts correctly but has no end-of-file marker is a\n"
+            "truncated download. Re-run with --force to refetch it."
+        ) from exc
+
     print(f"\n{path.relative_to(REPO_ROOT)}")
-    print(f"  {path.stat().st_size / 1e6:.1f} MB, {len(reader.pages)} pages")
+    print(f"  {size / 1e6:.1f} MB ({size:,} bytes), {len(reader.pages)} pages")
 
     hits: list[str] = []
     for page in reader.pages[:FRONT_MATTER_PAGES]:
