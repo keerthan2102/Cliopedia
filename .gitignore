@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Cliopedia — personal layer (contains PII, keep out of the public repo)
+.claude/soul.md
