@@ -178,6 +178,62 @@ def report(path: Path) -> None:
         )
 
 
+def inspect(url: str, path: Path) -> None:
+    """Report what the server says and what landed on disk, without downloading.
+
+    Exists because a 324 MB fetch is far too expensive to use as a debugging
+    loop. When a download arrives at exactly the declared Content-Length and is
+    still not a readable PDF, the interesting questions are all answerable from
+    the response headers and the last few hundred bytes of the file.
+    """
+    print(f"URL: {url}\n")
+    request = urllib.request.Request(url, method="HEAD")
+    try:
+        with urllib.request.urlopen(request) as response:
+            print(f"  HTTP {response.status}")
+            interesting = (
+                "Content-Length", "Content-Type", "Content-Encoding", "Accept-Ranges",
+                "ETag", "Last-Modified", "Server", "Via", "X-Cache", "Age",
+            )
+            for header in interesting:
+                value = response.headers.get(header)
+                if value:
+                    print(f"  {header}: {value}")
+    except urllib.error.URLError as exc:
+        print(f"  HEAD failed: {exc}")
+
+    # Ask for the last 1 KiB specifically. If the server honours the range and
+    # that tail contains %%EOF, the complete file is reachable and whatever we
+    # stored is the problem. If the range is refused or the tail still has no
+    # %%EOF, the object being served is itself incomplete.
+    print("\nRange request for the final 1024 bytes:")
+    ranged = urllib.request.Request(url, headers={"Range": "bytes=-1024"})
+    try:
+        with urllib.request.urlopen(ranged) as response:
+            tail = response.read()
+            print(f"  HTTP {response.status} (206 means ranges are supported)")
+            print(f"  Content-Range: {response.headers.get('Content-Range')}")
+            print(f"  got {len(tail)} bytes, contains %%EOF: {b'%%EOF' in tail}")
+            print(f"  last 60 bytes: {tail[-60:]!r}")
+    except urllib.error.URLError as exc:
+        print(f"  range request failed: {exc}")
+
+    if not path.exists():
+        print(f"\nNo local file at {path}")
+        return
+
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        head = handle.read(16)
+        handle.seek(-1024, 2)
+        tail = handle.read()
+    print(f"\nLocal file {path.relative_to(REPO_ROOT)}")
+    print(f"  {size:,} bytes (multiple of 4096: {size % 4096 == 0})")
+    print(f"  first 16 bytes: {head!r}")
+    print(f"  contains %%EOF in last 1024 bytes: {b'%%EOF' in tail}")
+    print(f"  last 60 bytes: {tail[-60:]!r}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--url", default=DEFAULT_URL, help="PDF to fetch")
@@ -185,7 +241,16 @@ def main() -> int:
     parser.add_argument(
         "--force", action="store_true", help="re-download even if the file exists"
     )
+    parser.add_argument(
+        "--inspect",
+        action="store_true",
+        help="diagnose without downloading: server headers plus the local file's tail",
+    )
     args = parser.parse_args()
+
+    if args.inspect:
+        inspect(args.url, RAW_DIR / args.filename)
+        return 0
 
     dest = RAW_DIR / args.filename
     if dest.exists() and not args.force:
