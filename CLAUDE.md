@@ -394,6 +394,15 @@ Format:
   any phrase, join the pages and collapse whitespace
   (`" ".join(text.split())`). Report a window of surrounding context rather than
   "the matching line", because there is no such thing as a meaningful line here.
+- **Then it failed again on punctuation**: with the wrap fixed, the check still
+  warned. OpenStax prints "Attribution Non-Commercial ShareAlike"; Creative
+  Commons' own name is "Attribution-NonCommercial-ShareAlike". Same licence,
+  different hyphens. **Never match prose against prose.** Reduce both sides to a
+  canonical form — here, strip every non-alphanumeric character — and accept any
+  of the equivalent spellings (long name, short code `CC BY-NC-SA 4.0`, or the
+  licence URL path). Guarding a claim this important needs a matcher that cannot
+  be defeated by typography, and it must still reject near misses: CC BY 4.0,
+  CC BY-NC 4.0, and BY-NC-SA **3.0** are all different licences.
 - **Consequence beyond this script**: the same wrapping runs through the whole
   corpus, so it reaches chunking and retrieval too. A chunk boundary landing on
   an extracted line break is not a sentence boundary, and a citation snippet

@@ -48,8 +48,21 @@ RAW_DIR = REPO_ROOT / "data" / "raw"
 DEFAULT_URL = "https://assets.openstax.org/oscms-prodcms/media/documents/US_History_-_WEB.pdf"
 DEFAULT_FILENAME = "openstax-us-history.pdf"
 
-# What the licence line is expected to say, per CLAUDE.md §8 Rule 3.
-EXPECTED_LICENCE = "Attribution-NonCommercial-ShareAlike"
+# The licence this corpus must carry, per CLAUDE.md §8 Rule 3.
+EXPECTED_LICENCE = "CC BY-NC-SA 4.0"
+
+# Matching is done against these, after stripping every non-alphanumeric
+# character from both sides. Publishers punctuate the same licence differently —
+# OpenStax's copyright page reads "Attribution Non-Commercial ShareAlike" while
+# Creative Commons' own name for it is "Attribution-NonCommercial-ShareAlike".
+# Those are the same licence, and no amount of guessing at hyphens will match
+# both. Squashing to bare alphanumerics makes the punctuation irrelevant.
+# Either form is accepted: the long name, or the short code the page also prints.
+EXPECTED_LICENCE_FORMS = (
+    "attributionnoncommercialsharealike",  # the long name, however punctuated
+    "ccbyncsa40",                          # the short code
+    "licensesbyncsa40",                    # the canonical URL path
+)
 
 # How many leading pages to scan for the copyright notice. OpenStax front matter
 # puts it within the first few pages; 12 is slack, not a measurement.
@@ -222,11 +235,12 @@ def report(path: Path) -> None:
     for passage in dict.fromkeys(hits):
         print(f"    ...{passage}...")
 
-    if EXPECTED_LICENCE.lower() in haystack:
+    squashed = "".join(ch for ch in haystack if ch.isalnum())
+    if any(form in squashed for form in EXPECTED_LICENCE_FORMS):
         print(f"\n  Matches the expected licence ({EXPECTED_LICENCE}).")
     else:
         print(
-            f"\n  WARNING: expected {EXPECTED_LICENCE!r} and did not find it.\n"
+            f"\n  WARNING: expected {EXPECTED_LICENCE} and did not find it.\n"
             "  Attribution is a licence obligation. Do not publish until README\n"
             "  and CLAUDE.md agree with what the document actually says."
         )
