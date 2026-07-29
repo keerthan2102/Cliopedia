@@ -1,0 +1,48 @@
+# Cliopedia dependencies.
+#
+# Versions are pinned exactly (==), not floated (>=). Streamlit Community Cloud
+# installs from this same file, so an exact pin is what makes the deployed app
+# and the laptop run identical code. LangChain in particular has moved import
+# paths between minor releases; a floating pin can break a deploy with no commit
+# to blame it on.
+#
+# Verified against PyPI on 2026-07-29. Python 3.11+.
+
+# --- LangChain, used thinly (see CLAUDE.md 4.1) -----------------------------
+# LangChain 1.x is split across several packages. We install only the ones we
+# import from, and deliberately NOT the `langchain` meta-package itself: in 1.x
+# that is core plumbing plus LangGraph, none of which this project touches.
+# We use LangChain for loaders, splitters, and the Chroma wrapper. The
+# retrieve -> prompt -> generate -> cite loop is our own code.
+
+langchain-community==0.4.2       # PyPDFLoader: one Document per PDF page
+langchain-text-splitters==1.1.2  # RecursiveCharacterTextSplitter
+langchain-chroma==1.1.0          # Chroma vector store wrapper
+langchain-huggingface==1.2.2     # HuggingFaceEmbeddings
+
+# --- Vector store and embeddings --------------------------------------------
+# chromadb arrives as a langchain-chroma dependency, and sentence-transformers
+# as a langchain-huggingface one. Both are pinned here anyway: they are named
+# decisions in SPEC.md 2, not incidental transitive packages, and an explicit
+# pin means an upstream loosening cannot move them without a commit here.
+
+chromadb==1.5.9                  # the vector database, persisted to data/chroma/
+sentence-transformers==5.6.1     # runs all-MiniLM-L6-v2 (SPEC.md 2.2, option A)
+
+# --- Document loading --------------------------------------------------------
+pypdf==6.14.2                    # the PDF parser PyPDFLoader delegates to
+
+# --- LLM client --------------------------------------------------------------
+# One OpenAI-compatible client for both backends. Ollama (local) and Groq
+# (deployed) both speak this API, so switching is config, never a code branch.
+
+openai==2.50.0
+python-dotenv==1.2.2             # loads .env into the environment, read in config.py
+
+# --- UI (P1) -----------------------------------------------------------------
+# Present from P0 so there is one dependency file for laptop and for deploy.
+
+streamlit==1.60.0
+
+# --- Tests -------------------------------------------------------------------
+pytest==9.1.1
