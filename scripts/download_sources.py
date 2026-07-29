@@ -185,11 +185,9 @@ def report(path: Path) -> None:
     try:
         reader = PdfReader(str(path))
         pages = len(reader.pages)
-        hits: list[str] = []
-        for page in reader.pages[:FRONT_MATTER_PAGES]:
-            for line in (page.extract_text() or "").splitlines():
-                if "creative commons" in line.lower() or "creativecommons.org" in line.lower():
-                    hits.append(line.strip())
+        front_matter = " ".join(
+            (page.extract_text() or "") for page in reader.pages[:FRONT_MATTER_PAGES]
+        )
     except Exception as exc:  # pypdf raises several unrelated types on damage
         raise SystemExit(
             f"\n{path.relative_to(REPO_ROOT)} is {size:,} bytes but pypdf cannot\n"
@@ -201,14 +199,30 @@ def report(path: Path) -> None:
     print(f"\n{path.relative_to(REPO_ROOT)}")
     print(f"  {size / 1e6:.1f} MB ({size:,} bytes), {pages} pages")
 
-    print("\n  Licence lines found in the front matter:")
+    # Whitespace is collapsed across the whole front matter before matching, and
+    # this is the point rather than tidiness. A licence name is long enough to
+    # wrap, and OpenStax's does: the copyright page breaks it right after
+    # "licensed under a Creative Commons". Matching line by line therefore cut
+    # the sentence in half and reported a false mismatch against the very words
+    # that had scrolled onto the next line. Searching one normalised string
+    # cannot be defeated by a line break.
+    normalised = " ".join(front_matter.split())
+    haystack = normalised.lower()
+
+    hits: list[str] = []
+    cursor = 0
+    while (found := haystack.find("creative commons", cursor)) != -1:
+        hits.append(normalised[max(0, found - 60):found + 220].strip())
+        cursor = found + 1
+
+    print("\n  Licence text found in the front matter:")
     if not hits:
         print("    (none — read the copyright page yourself before publishing)")
         return
-    for line in dict.fromkeys(hits):
-        print(f"    {line}")
+    for passage in dict.fromkeys(hits):
+        print(f"    ...{passage}...")
 
-    if any(EXPECTED_LICENCE.lower() in line.lower() for line in hits):
+    if EXPECTED_LICENCE.lower() in haystack:
         print(f"\n  Matches the expected licence ({EXPECTED_LICENCE}).")
     else:
         print(

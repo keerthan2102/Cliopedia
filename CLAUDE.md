@@ -381,3 +381,22 @@ Format:
   Prefer OpenStax's `_-_WEB.pdf` over `-OP.pdf`: this pipeline only extracts
   text, so print-resolution imagery is pure cost.
 - **Date**: 2026-07-29
+
+### Rule 8: PDF text wraps — normalise whitespace before matching anything
+
+- **Trigger**: the licence check in `download_sources.py` matched line by line.
+  OpenStax's copyright page breaks the sentence immediately after "licensed
+  under a Creative Commons", so the check printed a half sentence and warned of
+  a licence mismatch against words that had merely moved to the next line. The
+  document was correct; the matcher was not.
+- **Correct behavior**: `page.extract_text()` preserves the *visual* line breaks
+  of a printed page, not sentence structure. Before searching extracted text for
+  any phrase, join the pages and collapse whitespace
+  (`" ".join(text.split())`). Report a window of surrounding context rather than
+  "the matching line", because there is no such thing as a meaningful line here.
+- **Consequence beyond this script**: the same wrapping runs through the whole
+  corpus, so it reaches chunking and retrieval too. A chunk boundary landing on
+  an extracted line break is not a sentence boundary, and a citation snippet
+  shown verbatim will carry those breaks into the UI. Worth remembering at
+  `ingest.py` and at P1.
+- **Date**: 2026-07-29
