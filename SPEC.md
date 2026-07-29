@@ -98,9 +98,8 @@ the vectors, so changing it later means a full rebuild.
 | **A. `sentence-transformers`** | Pulls PyTorch, several hundred MB | The standard, best-documented path. Risk: may strain Streamlit Community Cloud's free-tier resources. |
 | **B. Chroma's built-in ONNX embedder** | ~90MB, no PyTorch | Same underlying model, exported to ONNX. Much lighter deploy. Risk: less common in tutorials, so you're on a quieter path. |
 
-**Recommendation: start with A, because it's the best-documented path while
-you're learning.** Treat B as the documented fallback if deployment hits
-resource limits at P3.
+**Decided: option A**, because it's the best-documented path while you're
+learning. B is the documented fallback if deployment hits resource limits at P3.
 
 > **Uncertainty, stated plainly:** I have *not* verified current Streamlit
 > Community Cloud memory/storage limits, and I have *not* benchmarked whether a
@@ -434,6 +433,6 @@ interviewer probes.
 
 | # | Decision | Status |
 |---|---|---|
-| 1 | Embedding runtime: `sentence-transformers` vs Chroma ONNX (§2.2) | **Recommend A now, revisit at P3** |
+| 1 | Embedding runtime: `sentence-transformers` vs Chroma ONNX (§2.2) | **Decided: `sentence-transformers`.** ONNX is the P3 fallback |
 | 2 | Exact Groq model for deployment | **Deferred to P3** — free-tier lineup changes |
 | 3 | Chunk size / overlap / `k` | **Defaults now, tuned with evidence at P3** |
