@@ -343,3 +343,19 @@ Format:
   message buys nothing — Git renders it as plain text. Always read the message
   back with `git log -1 --format=%B` after committing.
 - **Date**: 2026-07-29
+
+### Rule 6: a history rewrite starts with a backup ref and checks every step
+
+- **Trigger**: rewriting a pushed commit message, the chained recovery used
+  `git cherry-pick <sha> -q`. There is no `-q` on cherry-pick, so both picks
+  failed with a usage error — and `set -e` did not stop the script, so the
+  following `git commit --amend` landed on the *wrong* commit and silently
+  discarded two commits' worth of work from `HEAD`.
+- **Correct behavior**: before any `reset --hard` / `cherry-pick` / rebase
+  sequence, create a backup ref (`git branch backup-before-x`). Check each
+  command's exit status explicitly rather than trusting `set -e` through a
+  pipeline. Prove the rewrite is content-neutral by comparing tree hashes
+  (`git rev-parse backup^{tree}` vs `HEAD^{tree}`) — an empty `git diff` is
+  weaker evidence than identical tree hashes. Only then force-push, and use
+  `--force-with-lease`, never bare `--force`.
+- **Date**: 2026-07-29
