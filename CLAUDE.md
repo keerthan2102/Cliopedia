@@ -69,11 +69,14 @@ ollama pull llama3.1:8b
 ollama serve
 
 # Fetch the corpus into data/raw/  (git-ignored)
-# Prints page count and the licence line off the PDF itself — read it.
-# The built-in URL is unverified; if it 404s, get the real link from
-# https://openstax.org/details/books/us-history and pass it through:
+# Verifies the %PDF- header AND the %%EOF marker, then prints page count
+# and the licence line off the PDF itself — read it.
 python scripts/download_sources.py
-python scripts/download_sources.py --url <pdf-url>
+python scripts/download_sources.py --force        # refetch over an existing file
+
+# Check a candidate URL WITHOUT downloading it (see §8 Rule 7).
+# One HEAD plus a 128 KiB range request; costs seconds, not megabytes.
+python scripts/download_sources.py --url <pdf-url> --inspect
 
 # Build the Chroma index  (run after any corpus or embedding-model change)
 python -m cliopedia.ingest
