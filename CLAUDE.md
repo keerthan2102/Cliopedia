@@ -78,6 +78,10 @@ python scripts/download_sources.py --force        # refetch over an existing fil
 # One HEAD plus a 128 KiB range request; costs seconds, not megabytes.
 python scripts/download_sources.py --url <pdf-url> --inspect
 
+# Show the resolved configuration (API key redacted).
+# First thing to run when a deployment behaves differently from local.
+python -m cliopedia.config
+
 # Build the Chroma index  (run after any corpus or embedding-model change)
 python -m cliopedia.ingest
 
