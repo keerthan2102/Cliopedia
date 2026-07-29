@@ -29,10 +29,17 @@ RAW_DIR = REPO_ROOT / "data" / "raw"
 
 # The OpenStax U.S. History PDF.
 #
-# Verified working on 2026-07-29: serves a 324 MB print-quality PDF. If it ever
-# 404s, get the current link from the book's page and pass it with --url:
+# KNOWN BROKEN as of 2026-07-29, kept only so --inspect has something to point
+# at. It resolves and returns HTTP 200, which is why it was briefly mistaken for
+# a good link — but the object behind it is a stale 2016 upload
+# (Last-Modified 2016-04-29, S3 multipart ETag ending -5) that is truncated:
+# 324,153,344 bytes, an exact multiple of 4096, with no %%EOF marker anywhere in
+# its tail. Downloading it succeeds and produces a file pypdf cannot open.
+#
+# Resolving is not the same as being the right file. Get the current link from
+# the book's page, check it cheaply with --inspect before spending a full
+# download on it, and replace this constant in the same commit:
 #     https://openstax.org/details/books/us-history
-# then correct the constant below in the same commit that records the fix.
 DEFAULT_URL = "https://assets.openstax.org/oscms-prodcms/media/documents/USHistory-OP.pdf"
 DEFAULT_FILENAME = "openstax-us-history.pdf"
 
@@ -42,6 +49,11 @@ EXPECTED_LICENCE = "Attribution-NonCommercial-ShareAlike"
 # How many leading pages to scan for the copyright notice. OpenStax front matter
 # puts it within the first few pages; 12 is slack, not a measurement.
 FRONT_MATTER_PAGES = 12
+
+# How much of the file's tail --inspect scans for the %%EOF marker. Large enough
+# that trailing data after the marker cannot hide it, small enough to fetch in
+# one range request rather than re-downloading hundreds of megabytes.
+TAIL_SCAN_BYTES = 131072
 
 
 def download(url: str, dest: Path) -> None:
@@ -202,18 +214,26 @@ def inspect(url: str, path: Path) -> None:
     except urllib.error.URLError as exc:
         print(f"  HEAD failed: {exc}")
 
-    # Ask for the last 1 KiB specifically. If the server honours the range and
-    # that tail contains %%EOF, the complete file is reachable and whatever we
-    # stored is the problem. If the range is refused or the tail still has no
-    # %%EOF, the object being served is itself incomplete.
-    print("\nRange request for the final 1024 bytes:")
-    ranged = urllib.request.Request(url, headers={"Range": "bytes=-1024"})
+    # Scan a generous tail, not just the final bytes. A PDF is allowed to carry
+    # trailing data after its %%EOF marker, so finding no marker in the last
+    # kilobyte proves nothing on its own — the marker could simply be further
+    # back. Only its absence across a large tail distinguishes "the served
+    # object is truncated" from "the file is fine but ends untidily".
+    print(f"\nRange request for the final {TAIL_SCAN_BYTES:,} bytes:")
+    ranged = urllib.request.Request(url, headers={"Range": f"bytes=-{TAIL_SCAN_BYTES}"})
     try:
         with urllib.request.urlopen(ranged) as response:
             tail = response.read()
             print(f"  HTTP {response.status} (206 means ranges are supported)")
             print(f"  Content-Range: {response.headers.get('Content-Range')}")
-            print(f"  got {len(tail)} bytes, contains %%EOF: {b'%%EOF' in tail}")
+            print(f"  got {len(tail):,} bytes")
+            marker = tail.rfind(b"%%EOF")
+            if marker == -1:
+                print(f"  NO %%EOF anywhere in the last {len(tail):,} bytes")
+                print("  -> the object being served is itself incomplete")
+            else:
+                print(f"  %%EOF found {len(tail) - marker:,} bytes from the end")
+                print("  -> the complete object is reachable; the fetch is at fault")
             print(f"  last 60 bytes: {tail[-60:]!r}")
     except urllib.error.URLError as exc:
         print(f"  range request failed: {exc}")
@@ -225,12 +245,13 @@ def inspect(url: str, path: Path) -> None:
     size = path.stat().st_size
     with path.open("rb") as handle:
         head = handle.read(16)
-        handle.seek(-1024, 2)
+        handle.seek(-min(TAIL_SCAN_BYTES, size), 2)
         tail = handle.read()
     print(f"\nLocal file {path.relative_to(REPO_ROOT)}")
     print(f"  {size:,} bytes (multiple of 4096: {size % 4096 == 0})")
     print(f"  first 16 bytes: {head!r}")
-    print(f"  contains %%EOF in last 1024 bytes: {b'%%EOF' in tail}")
+    marker = tail.rfind(b"%%EOF")
+    print(f"  %%EOF in last {len(tail):,} bytes: " + (f"yes, {len(tail) - marker:,} from end" if marker != -1 else "NO"))
     print(f"  last 60 bytes: {tail[-60:]!r}")
 
 
