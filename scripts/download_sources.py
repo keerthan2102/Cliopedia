@@ -27,20 +27,25 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = REPO_ROOT / "data" / "raw"
 
-# The OpenStax U.S. History PDF.
+# The OpenStax U.S. History PDF — the WEB edition, not the print one.
 #
-# KNOWN BROKEN as of 2026-07-29, kept only so --inspect has something to point
-# at. It resolves and returns HTTP 200, which is why it was briefly mistaken for
-# a good link — but the object behind it is a stale 2016 upload
-# (Last-Modified 2016-04-29, S3 multipart ETag ending -5) that is truncated:
-# 324,153,344 bytes, an exact multiple of 4096, with no %%EOF marker anywhere in
-# its tail. Downloading it succeeds and produces a file pypdf cannot open.
+# Confirmed 2026-07-29 with --inspect: 136,400,038 bytes, Last-Modified
+# 2026-04-21, tail ends "startxref\n216\n%%EOF\n". A structurally complete PDF.
 #
-# Resolving is not the same as being the right file. Get the current link from
-# the book's page, check it cheaply with --inspect before spending a full
-# download on it, and replace this constant in the same commit:
+# There is also a USHistory-OP.pdf at the same prefix. Do not use it. It returns
+# HTTP 200 and downloads happily, but the object is a stale 2016 upload
+# (Last-Modified 2016-04-29) truncated to 324,153,344 bytes — an exact multiple
+# of 4096 — with no %%EOF marker anywhere in its tail. It cost two full
+# downloads to discover. Resolving is not the same as being the right file.
+#
+# The WEB edition is also the right choice on the merits: less than half the
+# size, because this pipeline only ever extracts text and never needs
+# print-resolution imagery.
+#
+# If this link ever breaks, get the current one from the book's page and check
+# it with --inspect BEFORE downloading it:
 #     https://openstax.org/details/books/us-history
-DEFAULT_URL = "https://assets.openstax.org/oscms-prodcms/media/documents/USHistory-OP.pdf"
+DEFAULT_URL = "https://assets.openstax.org/oscms-prodcms/media/documents/US_History_-_WEB.pdf"
 DEFAULT_FILENAME = "openstax-us-history.pdf"
 
 # What the licence line is expected to say, per CLAUDE.md §8 Rule 3.
@@ -121,14 +126,31 @@ def verify_is_pdf(path: Path) -> None:
     the bytes %PDF-; checking them costs nothing and catches the case where we
     cheerfully saved an error page as openstax-us-history.pdf.
     """
+    size = path.stat().st_size
     with path.open("rb") as handle:
         magic = handle.read(5)
+        handle.seek(-min(TAIL_SCAN_BYTES, size), 2)
+        tail = handle.read()
+
     if magic != b"%PDF-":
-        size = path.stat().st_size
         path.unlink()
         raise SystemExit(
             f"Downloaded file is not a PDF (starts with {magic!r}, {size} bytes).\n"
             "That usually means the URL served an error page. Deleted it."
+        )
+
+    # Checking the head alone is not enough, and this was learned the expensive
+    # way: OpenStax's print-edition URL serves a truncated 2016 object that
+    # starts with a perfectly good %PDF- header and simply stops partway. Every
+    # valid PDF ends with %%EOF, so verifying the tail is what distinguishes a
+    # whole document from its first two thirds.
+    if b"%%EOF" not in tail:
+        path.unlink()
+        raise SystemExit(
+            f"Downloaded {size:,} bytes with a valid PDF header but no %%EOF marker\n"
+            f"in the last {len(tail):,} bytes — the file is incomplete. Deleted it.\n\n"
+            "This is usually the server's fault, not the connection's. Check the\n"
+            "URL with --inspect before spending another download on it."
         )
 
 
@@ -154,24 +176,30 @@ def report(path: Path) -> None:
         return
 
     size = path.stat().st_size
+
+    # Every pypdf call sits inside this one guard, not just the constructor.
+    # pypdf parses lazily: PdfReader() on a damaged file can return happily and
+    # only raise later, when the page tree is first walked. Guarding only the
+    # construction produces a traceback at len(reader.pages) instead of the
+    # intended message.
     try:
         reader = PdfReader(str(path))
+        pages = len(reader.pages)
+        hits: list[str] = []
+        for page in reader.pages[:FRONT_MATTER_PAGES]:
+            for line in (page.extract_text() or "").splitlines():
+                if "creative commons" in line.lower() or "creativecommons.org" in line.lower():
+                    hits.append(line.strip())
     except Exception as exc:  # pypdf raises several unrelated types on damage
         raise SystemExit(
             f"\n{path.relative_to(REPO_ROOT)} is {size:,} bytes but pypdf cannot\n"
             f"read it: {type(exc).__name__}: {exc}\n\n"
-            "A PDF that starts correctly but has no end-of-file marker is a\n"
-            "truncated download. Re-run with --force to refetch it."
+            "The file is damaged or incomplete. Check the source URL with\n"
+            "--inspect, then re-run with --force to refetch."
         ) from exc
 
     print(f"\n{path.relative_to(REPO_ROOT)}")
-    print(f"  {size / 1e6:.1f} MB ({size:,} bytes), {len(reader.pages)} pages")
-
-    hits: list[str] = []
-    for page in reader.pages[:FRONT_MATTER_PAGES]:
-        for line in (page.extract_text() or "").splitlines():
-            if "creative commons" in line.lower() or "creativecommons.org" in line.lower():
-                hits.append(line.strip())
+    print(f"  {size / 1e6:.1f} MB ({size:,} bytes), {pages} pages")
 
     print("\n  Licence lines found in the front matter:")
     if not hits:
@@ -230,10 +258,10 @@ def inspect(url: str, path: Path) -> None:
             marker = tail.rfind(b"%%EOF")
             if marker == -1:
                 print(f"  NO %%EOF anywhere in the last {len(tail):,} bytes")
-                print("  -> the object being served is itself incomplete")
+                print("  -> the object being served is itself incomplete; do not download it")
             else:
                 print(f"  %%EOF found {len(tail) - marker:,} bytes from the end")
-                print("  -> the complete object is reachable; the fetch is at fault")
+                print("  -> the served object ends properly; safe to download")
             print(f"  last 60 bytes: {tail[-60:]!r}")
     except urllib.error.URLError as exc:
         print(f"  range request failed: {exc}")

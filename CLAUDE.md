@@ -359,3 +359,22 @@ Format:
   weaker evidence than identical tree hashes. Only then force-push, and use
   `--force-with-lease`, never bare `--force`.
 - **Date**: 2026-07-29
+
+### Rule 7: HTTP 200 is not verification — check the artifact's structure
+
+- **Trigger**: `DEFAULT_URL` in `scripts/download_sources.py` was a guess at
+  OpenStax's asset naming. It returned HTTP 200 and downloaded 324 MB, so it was
+  marked "verified working". It was not: the object was a stale 2016 upload
+  (`Last-Modified` 2016-04-29, S3 multipart ETag ending `-5`), truncated to
+  324,153,344 bytes — an exact multiple of 4096 — with no `%%EOF` marker. It
+  cost two full downloads and a wrong-headed truncation diagnosis to find.
+- **Correct behavior**: a fetch is verified when the *artifact* is checked, not
+  when the request succeeds. For a PDF that means the `%PDF-` header **and** a
+  `%%EOF` marker in the tail; `download_sources.py` now enforces both before the
+  file is kept. Check a candidate URL with `--inspect` — one HEAD plus a 128 KiB
+  range request — before spending a full download on it. Two signals worth
+  reading: a size that is an exact multiple of 4096 is almost never a real
+  document's length, and `Last-Modified` catches a stale asset instantly.
+  Prefer OpenStax's `_-_WEB.pdf` over `-OP.pdf`: this pipeline only extracts
+  text, so print-resolution imagery is pure cost.
+- **Date**: 2026-07-29
