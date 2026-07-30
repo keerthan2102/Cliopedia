@@ -45,12 +45,36 @@ CHUNK_OVERLAP = 150
 # and gives the run something to print.
 BATCH_SIZE = 500
 
+# Chroma defaults to L2 (straight-line) distance. SPEC.md §6.2 specifies cosine,
+# which compares the *direction* of two vectors and ignores their length — the
+# right choice for text, where a longer passage produces a longer vector without
+# being any more relevant.
+#
+# This is fixed when the collection is created and cannot be changed afterwards.
+# An index built without it is silently ranked by the wrong metric and has to be
+# rebuilt from scratch.
+COLLECTION_METADATA = {"hnsw:space": "cosine"}
+
 # Which document each file is, for citation purposes. One entry today; P2 adds
 # primary sources, which must be labelled distinctly from the textbook so the UI
 # can tell a student "this is a period document, read it critically".
 SOURCES: dict[str, tuple[str, str]] = {
     "openstax-us-history.pdf": ("OpenStax U.S. History", "secondary"),
 }
+
+
+def _display(path):
+    """Path relative to the repo when it lives there, absolute when it does not.
+
+    CHROMA_DIR may legitimately point outside the repository — config.py
+    supports an absolute value — and Path.relative_to raises rather than
+    degrading when the path is elsewhere. An error message is the worst place
+    for a second, unrelated exception.
+    """
+    try:
+        return path.relative_to(REPO_ROOT)
+    except ValueError:
+        return path
 
 
 class IngestError(RuntimeError):
@@ -193,7 +217,7 @@ def build_index(rebuild: bool = False, embeddings=None) -> int:
     """
     if not RAW_DIR.exists() or not (pdfs := sorted(RAW_DIR.glob("*.pdf"))):
         raise IngestError(
-            f"No PDFs in {RAW_DIR.relative_to(REPO_ROOT)}.\n"
+            f"No PDFs in {_display(RAW_DIR)}.\n"
             "Run: python scripts/download_sources.py"
         )
 
@@ -201,11 +225,11 @@ def build_index(rebuild: bool = False, embeddings=None) -> int:
     if chroma_dir.exists() and any(chroma_dir.iterdir()):
         if not rebuild:
             raise IngestError(
-                f"{chroma_dir.relative_to(REPO_ROOT)} already contains an index.\n"
+                f"{_display(chroma_dir)} already contains an index.\n"
                 "Ingesting again would append, storing every chunk twice and\n"
                 "silently degrading retrieval. Pass --rebuild to replace it."
             )
-        print(f"Removing existing index at {chroma_dir.relative_to(REPO_ROOT)}")
+        print(f"Removing existing index at {_display(chroma_dir)}")
         shutil.rmtree(chroma_dir)
 
         # Chroma caches one client per persist_directory for the lifetime of the
@@ -219,7 +243,7 @@ def build_index(rebuild: bool = False, embeddings=None) -> int:
 
         SharedSystemClient.clear_system_cache()
 
-    print(f"Loading {len(pdfs)} PDF(s) from {RAW_DIR.relative_to(REPO_ROOT)}")
+    print(f"Loading {len(pdfs)} PDF(s) from {_display(RAW_DIR)}")
     chunks = load_and_split(pdfs)
     if not chunks:
         raise IngestError("Splitting produced no chunks — is the PDF text-extractable?")
@@ -240,6 +264,7 @@ def build_index(rebuild: bool = False, embeddings=None) -> int:
     store = Chroma(
         persist_directory=str(chroma_dir),
         embedding_function=embeddings,
+        collection_metadata=COLLECTION_METADATA,
     )
 
     print(f"\nEmbedding {len(chunks)} chunks in batches of {BATCH_SIZE}")
@@ -268,7 +293,7 @@ def main() -> int:
         print(f"\n{exc}")
         return 1
 
-    print(f"\nIndexed {count} chunks into {settings.chroma_dir.relative_to(REPO_ROOT)}")
+    print(f"\nIndexed {count} chunks into {_display(settings.chroma_dir)}")
     print(f"Embedding model: {settings.embedding_model}")
     print("\nThe index is a committed build artifact — commit it.")
     print("Next: python -m cliopedia.retrieve  (not written yet)")
