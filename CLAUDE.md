@@ -23,7 +23,8 @@ This is a **portfolio project**. Its audience is a hiring manager reading the
 repo cold, and the author defending it in an interview. That governs every
 tradeoff: clarity over cleverness, explainability over brevity.
 
-**Status: Phase 0 (planning) complete. No application code exists yet.**
+**Status: P0 complete — the full retrieve → prompt → generate → cite
+pipeline runs from the terminal. P1 (Streamlit UI) is next.**
 
 ---
 
@@ -50,9 +51,8 @@ then use it anyway unless told otherwise in the current message.
 
 ## 3. Commands
 
-> Not yet implemented — these are the target commands defined in `SPEC.md`.
-> Update this section as each lands, and never document a command that doesn't
-> run.
+> Every command below runs. Update this section as each new one lands, and
+> never document a command that doesn't.
 
 ```bash
 # Setup — activation is the one platform-specific line.
@@ -85,8 +85,12 @@ python -m cliopedia.config
 # Build the Chroma index  (run after any corpus or embedding-model change)
 python -m cliopedia.ingest
 
+# Inspect retrieval on its own — no model needed, useful for debugging
+python -m cliopedia.retrieve "What caused the Louisiana Purchase?"
+
 # Ask a question from the terminal (P0)
 python -m cliopedia.ask "What caused the Louisiana Purchase?"
+python -m cliopedia.ask "..." --snippets    # show the verbatim passages
 
 # Run the UI (P1)
 streamlit run app.py

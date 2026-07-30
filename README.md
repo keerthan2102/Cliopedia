@@ -4,10 +4,10 @@ A local, open-source **RAG** (Retrieval-Augmented Generation) study assistant
 that answers history questions for students **with cited sources**, built on
 Ollama, LangChain, and ChromaDB.
 
-> **Status: Phase 0 — planning complete, no application code yet.**
-> The blueprint is in [`SPEC.md`](SPEC.md). This README documents the intended
-> system and will be updated as each phase actually ships. Nothing below is
-> claimed as working until it is.
+> **Status: P0 complete.** The full pipeline — retrieve, prompt, generate,
+> cite — runs from the terminal against a local Ollama model. P1 (the
+> Streamlit UI) is next. The blueprint is in [`SPEC.md`](SPEC.md); nothing
+> below is claimed as working until it is.
 
 ---
 
@@ -120,8 +120,8 @@ constrain the project rather than merely decorate it:
 
 ## Getting started
 
-> Not yet runnable. These are the target commands from [`SPEC.md`](SPEC.md) and
-> will be verified as each phase ships.
+> Everything through `python -m cliopedia.ask` works today. `streamlit run
+> app.py` is P1 and not yet built.
 
 **1. Create and activate the virtual environment.** This is the only step that
 differs by platform — pick the one line that matches your shell.
