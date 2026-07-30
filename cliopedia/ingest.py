@@ -3,7 +3,7 @@
 Run offline, never at query time:
 
     data/raw/*.pdf
-      → PyPDFLoader                     one Document per page, carrying its page
+      → load_pages()                    one Document per page, via pypdf directly
       → RecursiveCharacterTextSplitter  ~1000-char chunks, 150 of overlap
       → HuggingFaceEmbeddings           each chunk → a 384-number vector
       → Chroma(persist_directory=...)   stored on disk, committed to the repo
@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
@@ -61,6 +62,76 @@ def _describe(pdf: Path) -> tuple[str, str]:
     return title, source_type
 
 
+def _folio(page_text: str) -> int | None:
+    """The page number *printed on* this page, if it shows one.
+
+    Looked for in the last line first and the first line second, because that is
+    where a folio is typeset. Anything that is not a bare number is ignored —
+    guessing here would be worse than declining, since a confidently wrong page
+    reference is exactly the failure this project exists to prevent.
+    """
+    lines = [line.strip() for line in page_text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    for candidate in (lines[-1], lines[0]):
+        if candidate.isdigit() and 0 < int(candidate) < 10_000:
+            return int(candidate)
+    return None
+
+
+def _folio_offset(page_texts: list[str]) -> int | None:
+    """How far the printed numbering runs behind the PDF's own page count.
+
+    Front matter means PDF page 1 is rarely printed page 1, so the two numbering
+    schemes sit at a constant offset through the body of the book. Rather than
+    trust any single page's folio — a stray number in a table would do — every
+    detected folio votes on the offset, and the winner is accepted only if a
+    clear majority of detections agree.
+
+    Returning None is a valid, safe answer: it means "this book's layout defeats
+    the heuristic", and the caller then records no printed page at all rather
+    than a plausible-looking wrong one.
+    """
+    votes = Counter()
+    for index, text in enumerate(page_texts, start=1):
+        folio = _folio(text)
+        if folio is not None:
+            votes[index - folio] += 1
+
+    if not votes:
+        return None
+    offset, agreeing = votes.most_common(1)[0]
+    total = sum(votes.values())
+    if agreeing < 5 or agreeing * 2 <= total:
+        return None
+    return offset
+
+
+def load_pages(pdf: Path) -> tuple[list, int | None]:
+    """Read a PDF into one Document per page, using pypdf directly.
+
+    LangChain's PyPDFLoader used to do this. It was dropped because
+    `langchain-community` has been sunset upstream with no successor package,
+    and because the wrapper is a dozen lines that hid the one thing this project
+    cares most about — where a page number comes from. Writing it out keeps a
+    sunset dependency out of the deploy and matches CLAUDE.md §4.1: LangChain
+    for the boring stable parts, our own code for the explainable parts.
+    """
+    from langchain_core.documents import Document
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(pdf))
+    texts = [(page.extract_text() or "") for page in reader.pages]
+    offset = _folio_offset(texts)
+
+    pages = [
+        Document(page_content=text, metadata={"page_index": index})
+        for index, text in enumerate(texts, start=1)
+        if text.strip()  # image-only pages carry no retrievable text
+    ]
+    return pages, offset
+
+
 def load_and_split(pdf_paths: Iterable[Path]) -> list:
     """Turn PDFs into chunks that carry everything a citation needs.
 
@@ -70,8 +141,14 @@ def load_and_split(pdf_paths: Iterable[Path]) -> list:
     `locator_value` here and reassembled in `citations.py`. The tagged shape
     still survives where it matters: page-less sources added at P2 store
     `locator_kind="paragraph"` and need no schema change.
+
+    Two page numbers are stored, because they answer different questions.
+    `locator_value` is the PDF's own page — what you type into a viewer's page
+    box — and is always correct. `printed_page` is the number typeset on the
+    page, which is what a reader means by "page 214", and is recorded only when
+    the offset could be established with confidence. -1 means "not known", never
+    "probably this".
     """
-    from langchain_community.document_loaders import PyPDFLoader
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
     splitter = RecursiveCharacterTextSplitter(
@@ -82,21 +159,21 @@ def load_and_split(pdf_paths: Iterable[Path]) -> list:
     chunks: list = []
     for pdf in pdf_paths:
         title, source_type = _describe(pdf)
-        pages = PyPDFLoader(str(pdf)).load()
-        print(f"  {pdf.name}: {len(pages)} pages")
+        pages, offset = load_pages(pdf)
+        if offset is None:
+            print(f"  {pdf.name}: {len(pages)} text pages, printed numbering not established")
+        else:
+            print(f"  {pdf.name}: {len(pages)} text pages, printed page = PDF page - {offset}")
 
         for chunk in splitter.split_documents(pages):
-            # PyPDFLoader's `page` is a 0-based index into the PDF, so +1 gives
-            # the page you would type into a viewer's page box. That is NOT
-            # necessarily the number printed on the page — front matter offsets
-            # the two — and closing that gap is a known open item, not something
-            # to paper over by pretending they are the same.
-            page_index = chunk.metadata.get("page")
+            pdf_page = chunk.metadata["page_index"]
+            printed = pdf_page - offset if offset is not None else None
             chunk.metadata = {
                 "source_title": title,
                 "source_type": source_type,
                 "locator_kind": "page",
-                "locator_value": (page_index + 1) if page_index is not None else -1,
+                "locator_value": pdf_page,
+                "printed_page": printed if printed and printed > 0 else -1,
                 "source_file": pdf.name,
             }
             chunks.append(chunk)

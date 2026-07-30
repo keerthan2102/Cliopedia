@@ -15,7 +15,11 @@
 # We use LangChain for loaders, splitters, and the Chroma wrapper. The
 # retrieve -> prompt -> generate -> cite loop is our own code.
 
-langchain-community==0.4.2       # PyPDFLoader: one Document per PDF page
+# langchain-community is deliberately NOT here. It supplied PyPDFLoader, but
+# upstream has sunset the package with no successor, and the loader was a dozen
+# lines wrapping pypdf — which this project already depends on. cliopedia/ingest.py
+# reads PDFs directly instead. See CLAUDE.md §8 Rule 9.
+
 langchain-text-splitters==1.1.2  # RecursiveCharacterTextSplitter
 langchain-chroma==1.1.0          # Chroma vector store wrapper
 langchain-huggingface==1.2.2     # HuggingFaceEmbeddings
@@ -30,7 +34,9 @@ chromadb==1.5.9                  # the vector database, persisted to data/chroma
 sentence-transformers==5.6.1     # runs all-MiniLM-L6-v2 (SPEC.md 2.2, option A)
 
 # --- Document loading --------------------------------------------------------
-pypdf==6.14.2                    # the PDF parser PyPDFLoader delegates to
+# Now a DIRECT dependency, not a transitive one: cliopedia/ingest.py reads PDFs
+# with pypdf itself rather than through a LangChain loader.
+pypdf==6.14.2
 
 # --- LLM client --------------------------------------------------------------
 # One OpenAI-compatible client for both backends. Ollama (local) and Groq

@@ -42,7 +42,7 @@ then use it anyway unless told otherwise in the current message.
 | LLM (dev) | Ollama, `llama3.1:8b`, local |
 | LLM (deploy) | Groq free tier, OpenAI-compatible |
 | UI | Streamlit → Streamlit Community Cloud |
-| PDF loading | `pypdf` via LangChain's `PyPDFLoader` |
+| PDF loading | `pypdf`, read directly (see §8 Rule 9) |
 | Tests | `pytest` |
 | Corpus | OpenStax *U.S. History*, CC BY-NC-SA 4.0 (see §8 Rule 3) |
 
@@ -112,7 +112,7 @@ Offline, run separately and **never at query time**:
 
 ```
 data/raw/*.pdf
-  → PyPDFLoader                      one Document per page, carries page number
+  → load_pages() (pypdf)             one Document per page, carries page number
   → RecursiveCharacterTextSplitter   chunk_size=1000, chunk_overlap=150
   → HuggingFaceEmbeddings            each chunk → 384-number vector
   → Chroma(persist_directory="data/chroma")
@@ -122,7 +122,8 @@ Folder layout, component specs, and the UI wireframe are in `SPEC.md` §4–6.
 
 ### 4.1 LangChain is used thinly — this is deliberate
 
-Use LangChain for **document loaders, text splitters, and the Chroma wrapper**.
+Use LangChain for **text splitters, the embeddings wrapper, and the Chroma
+wrapper**. Document loading is our own code — see §8 Rule 9.
 
 Do **not** use `RetrievalQA` or any other prebuilt chain. The retrieve → build
 prompt → call model → attach citations loop is written explicitly in this
@@ -412,4 +413,36 @@ Format:
   an extracted line break is not a sentence boundary, and a citation snippet
   shown verbatim will carry those breaks into the UI. Worth remembering at
   `ingest.py` and at P1.
+- **Date**: 2026-07-29
+
+### Rule 9: `langchain-community` is sunset — read PDFs with `pypdf` directly
+
+- **Trigger**: `SPEC.md` §2 and §8 Rule 1 both name `langchain-community` as the
+  source of `PyPDFLoader`. Importing it prints a deprecation warning, and the
+  package's own README states it **has been sunset**. There is no successor —
+  no `langchain-pypdf` exists on PyPI.
+- **Correct behavior**: `cliopedia/ingest.py` reads PDFs with `pypdf` directly
+  in `load_pages()`, and `langchain-community` is removed from
+  `requirements.txt` (140 → 119 resolved packages). `pypdf` is now a **direct**
+  dependency rather than a transitive one. This is not a retreat from §4.1 but
+  an application of it: LangChain for the boring stable parts, our own code for
+  the explainable parts — and a sunset package is no longer the stable part.
+  The splitter, embeddings wrapper and Chroma wrapper all stay.
+- **Consequence**: `PyPDFLoader` set `page` as a **0-based** index. `load_pages()`
+  emits `page_index` **1-based**, matching what a PDF viewer's page box expects.
+  Do not mix the two conventions.
+- **Date**: 2026-07-29
+
+### Rule 10: cite the printed folio, never a guessed one
+
+- **Trigger**: the PDF's page index is not the number printed on the page —
+  OpenStax's front matter offsets them — so a citation reading "p. 214" would
+  have pointed at the wrong printed page. For a project whose thesis is that the
+  citation is the product, that is a correctness bug, not cosmetics.
+- **Correct behavior**: every chunk stores **both**. `locator_value` is the PDF
+  page, always correct for navigation. `printed_page` is the typeset folio, and
+  is filled in only when `_folio_offset()` establishes the offset with a clear
+  majority of pages agreeing — otherwise it is `-1`, meaning *not known*, never
+  *probably this*. Declining to answer is the safe result here, exactly as it is
+  for the model itself (§4.4).
 - **Date**: 2026-07-29
