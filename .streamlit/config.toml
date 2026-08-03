@@ -10,3 +10,13 @@ gatherUsageStats = false
 [server]
 # Nothing about a question needs to survive the request that asked it.
 enableStaticServing = false
+
+# The file watcher walks every imported module to offer hot-reload. transformers
+# resolves its submodules lazily, so merely inspecting them triggers imports of
+# vision code that wants torchvision — a dependency this project has no use for.
+# The result is pages of ModuleNotFoundError tracebacks at startup that look
+# like failures and are not.
+#
+# The cost is losing auto-rerun when a source file changes: after editing, press
+# "R" in the browser or restart. Worth it for a console a reader can trust.
+fileWatcherType = "none"
