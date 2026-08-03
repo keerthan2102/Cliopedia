@@ -4,10 +4,11 @@ A local, open-source **RAG** (Retrieval-Augmented Generation) study assistant
 that answers history questions for students **with cited sources**, built on
 Ollama, LangChain, and ChromaDB.
 
-> **Status: P0 complete.** The full pipeline — retrieve, prompt, generate,
-> cite — runs from the terminal against a local Ollama model. P1 (the
-> Streamlit UI) is next. The blueprint is in [`SPEC.md`](SPEC.md); nothing
-> below is claimed as working until it is.
+> **Status: P0 proven, P1 built.** A real history question returns a grounded
+> answer citing printed page numbers, running locally against Ollama over
+> 3775 chunks of the OpenStax corpus. The Streamlit UI is written but has not
+> yet been used by anyone but its author. The blueprint is in
+> [`SPEC.md`](SPEC.md); nothing here is claimed as working until it is.
 
 ---
 

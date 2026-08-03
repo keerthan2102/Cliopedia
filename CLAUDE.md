@@ -23,8 +23,10 @@ This is a **portfolio project**. Its audience is a hiring manager reading the
 repo cold, and the author defending it in an interview. That governs every
 tradeoff: clarity over cleverness, explainability over brevity.
 
-**Status: P0 complete — the full retrieve → prompt → generate → cite
-pipeline runs from the terminal. P1 (Streamlit UI) is next.**
+**Status: P0 proven end to end** — a real question returns a grounded answer
+citing printed page numbers, running locally against Ollama `llama3.1:8b`
+over 3775 chunks of the OpenStax corpus. **P1 (Streamlit UI) is built but
+not yet exercised by a human.** P2 is next.
 
 ---
 
