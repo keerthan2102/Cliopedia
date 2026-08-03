@@ -75,7 +75,7 @@ deployed app only ever reads — no database to run or host.
 | Layer | Choice | Why |
 |---|---|---|
 | Language | Python 3.11+ | — |
-| RAG framework | LangChain (loaders, splitters, Chroma wrapper) | Used thinly on purpose — the retrieve/prompt/generate/cite loop is written explicitly, not with a prebuilt chain |
+| RAG framework | LangChain (splitters, embeddings and Chroma wrappers) | Used thinly on purpose — the retrieve/prompt/generate/cite loop is written explicitly, not with a prebuilt chain. PDFs are read with `pypdf` directly |
 | Vector store | ChromaDB, persisted to disk | Runs in-process; no server to host |
 | Embeddings | `all-MiniLM-L6-v2` (384-dim) | ~90MB, CPU-only, free, no API key |
 | LLM (dev) | Ollama · `llama3.1:8b` | Fully local and free |
@@ -121,8 +121,7 @@ constrain the project rather than merely decorate it:
 
 ## Getting started
 
-> Everything through `python -m cliopedia.ask` works today. `streamlit run
-> app.py` is P1 and not yet built.
+> Every command below runs. `streamlit run app.py` starts the UI.
 
 **1. Create and activate the virtual environment.** This is the only step that
 differs by platform — pick the one line that matches your shell.
@@ -165,7 +164,8 @@ python scripts/download_sources.py # fetch the corpus into data/raw/
 python -m cliopedia.ingest         # build the Chroma index
 
 python -m cliopedia.ask "What caused the Louisiana Purchase?"
-streamlit run app.py               # P1
+pytest                             # 55 tests, no model or corpus needed
+streamlit run app.py               # the UI
 ```
 
 No API key is needed for local development — Ollama runs on your machine.
