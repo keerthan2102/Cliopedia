@@ -296,7 +296,7 @@ def main() -> int:
     print(f"\nIndexed {count} chunks into {_display(settings.chroma_dir)}")
     print(f"Embedding model: {settings.embedding_model}")
     print("\nThe index is a committed build artifact — commit it.")
-    print("Next: python -m cliopedia.retrieve  (not written yet)")
+    print('Next: python -m cliopedia.ask "What caused the Louisiana Purchase?"')
     return 0
 
 
