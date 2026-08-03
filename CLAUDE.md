@@ -449,4 +449,8 @@ Format:
   majority of pages agreeing — otherwise it is `-1`, meaning *not known*, never
   *probably this*. Declining to answer is the safe result here, exactly as it is
   for the model itself (§4.4).
+- **Confirmed on the real corpus, 2026-08-03**: the offset came out as 16 —
+  PDF page 226 is printed page 210 — checked against the PDF itself, on a
+  page whose text matches the retrieved chunk. Both the number and the
+  passage agree, so citations show the folio a reader actually sees.
 - **Date**: 2026-07-29

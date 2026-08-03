@@ -18,6 +18,7 @@ import textwrap
 
 from cliopedia.citations import attach
 from cliopedia.config import ConfigError
+from cliopedia.display import as_excerpt
 from cliopedia.generate import GenerationError, answer, is_refusal
 from cliopedia.retrieve import RetrievalError, retrieve
 
@@ -62,7 +63,13 @@ def ask(question: str, k: int | None = None, show_snippets: bool = False) -> int
     for citation in citations:
         print(f"  {citation.label}   (PDF page {citation.pdf_page})")
         if show_snippets:
-            print(_wrap(f"“{citation.snippet[:400]}…”", indent="      "))
+            # Same excerpt rendering as the UI. Marking a fragment with a
+            # leading ellipsis matters most in the terminal, where a snippet
+            # beginning mid-clause otherwise reads as a broken quotation.
+            excerpt = as_excerpt(citation.snippet)
+            if len(excerpt) > 400:
+                excerpt = excerpt[:400].rstrip() + "…"
+            print(_wrap(f"“{excerpt}”", indent="      "))
     return 0
 
 
