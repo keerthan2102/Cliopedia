@@ -1,0 +1,12 @@
+# Streamlit collects anonymous usage statistics by default. SPEC.md §10 states
+# this project stores no user data and runs no analytics, so the default is
+# turned off here rather than the claim being softened.
+#
+# secrets.toml lives beside this file in production and is git-ignored — the
+# real LLM_API_KEY goes there, never in this file.
+[browser]
+gatherUsageStats = false
+
+[server]
+# Nothing about a question needs to survive the request that asked it.
+enableStaticServing = false
