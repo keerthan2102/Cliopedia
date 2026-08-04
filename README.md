@@ -171,7 +171,7 @@ python scripts/download_sources.py # fetch the corpus into data/raw/
 python -m cliopedia.ingest         # build the Chroma index
 
 python -m cliopedia.ask "What caused the Louisiana Purchase?"
-pytest                             # 55 tests, no model or corpus needed
+pytest                             # no model or corpus needed
 streamlit run app.py               # the UI
 ```
 
