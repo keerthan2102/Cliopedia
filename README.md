@@ -158,7 +158,14 @@ cp .env.example .env               # Windows: copy .env.example .env
                                    # fill in local values; never commit .env
 
 ollama pull llama3.1:8b            # local model for development
-ollama serve
+                                   # (Windows runs Ollama as a service —
+                                   #  `ollama serve` will say the port is
+                                   #  already in use, which is fine)
+
+setx OLLAMA_KEEP_ALIVE -1          # optional: keep the model resident.
+                                   # Without it Ollama unloads after 5 min
+                                   # idle and the next question pays to
+                                   # reload it. Restart Ollama after setting.
 
 python scripts/download_sources.py # fetch the corpus into data/raw/
 python -m cliopedia.ingest         # build the Chroma index

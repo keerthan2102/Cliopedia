@@ -13,6 +13,8 @@ sources attached.
 
 from __future__ import annotations
 
+import threading
+
 import streamlit as st
 
 from cliopedia.citations import attach
@@ -51,8 +53,45 @@ def load_client():
     return make_client()
 
 
+@st.cache_resource(show_spinner=False)
+def warm_the_model():
+    """Ask the model for one token, in the background, at startup.
+
+    Measured behaviour: the first question of a session is slow and every
+    question after it is quick. That gap is Ollama loading the model into
+    memory, a fixed cost that does not shrink with a smaller model — swapping
+    8B for 3B made generation much faster and left this untouched.
+
+    The cost cannot be removed, only moved. Spending it while the page is
+    painting and the reader is still typing is better than spending it after
+    they press Ask.
+
+    On a daemon thread so nothing blocks the render, and failures are swallowed
+    on purpose: a cold model means a slow first question, not a broken app, and
+    the real error surfaces properly when the question is actually asked.
+    """
+
+    def _warm() -> None:
+        try:
+            client, model = make_client()
+            client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+            )
+        except Exception:
+            pass
+
+    thread = threading.Thread(target=_warm, daemon=True, name="cliopedia-warmup")
+    thread.start()
+    return thread
+
+
 st.title("📚 Cliopedia")
 st.caption("Ask a history question — every answer cites its source.")
+
+# Started before the form so the model loads while the question is being typed.
+warm_the_model()
 
 with st.form("ask"):
     question = st.text_input(
