@@ -219,3 +219,45 @@ def test_streamed_answer_length_is_capped_too():
     client = _FakeStreamClient(["x"])
     list(generate.answer_stream("q", PASSAGES, client=client, model="m"))
     assert client.seen["max_tokens"] == generate.MAX_ANSWER_TOKENS
+
+
+REAL_PARTIAL_ANSWER = (
+    "The election of Abraham Lincoln to the presidency in 1860 was a watershed "
+    "event that proved to be a culmination of increasing tensions between the "
+    "proslavery South and the antislavery North [2]. This led to the Confederate "
+    "attack on Fort Sumter, marking the beginning of the Civil War [2]. The year "
+    "1863 proved decisive for two major reasons [3].\n\n"
+    "This isn't covered in the source material."
+)
+
+
+def test_a_cited_answer_ending_with_the_refusal_is_not_a_refusal():
+    """Verbatim from a real run, and the bug it caused was severe.
+
+    The model answered in four cited paragraphs, then appended the refusal
+    sentence about the part it could not cover. A substring match classified the
+    whole answer as a refusal and dropped every source card — presenting fully
+    traceable work as though nothing had been found.
+    """
+    assert not generate.is_refusal(REAL_PARTIAL_ANSWER)
+
+
+def test_the_partial_answer_still_yields_its_citations():
+    from cliopedia.citations import attach
+
+    citations = attach(REAL_PARTIAL_ANSWER, PASSAGES + PASSAGES)
+    assert [c.number for c in citations] == [2, 3]
+
+
+def test_a_bare_refusal_is_still_recognised():
+    assert generate.is_refusal("This isn't covered in the source material.")
+
+
+def test_a_refusal_with_a_small_wrapper_is_still_recognised():
+    assert generate.is_refusal("Answer: This isn't covered in the source material.")
+
+
+def test_prompt_reserves_the_refusal_sentence_for_total_refusals():
+    """Rule 6 must not invite the model to use rule 2's sentence while answering."""
+    assert "reserved" in prompts.SYSTEM_PROMPT
+    assert "Do NOT use the sentence from rule 2" in prompts.SYSTEM_PROMPT

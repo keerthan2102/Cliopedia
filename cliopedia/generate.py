@@ -147,13 +147,29 @@ def answer_stream(
         ) from exc
 
 
-def is_refusal(text: str) -> bool:
-    """Whether an answer is the 'not in the source material' response.
+# How much text may surround the refusal sentence and still count as a refusal.
+# Enough for a stray "Answer:" prefix or a trailing apology; nowhere near enough
+# for a sentence of real content.
+_REFUSAL_SLACK = 24
 
-    Compared loosely on purpose. The prompt asks for an exact sentence, but
-    models add a trailing full stop, drop the apostrophe, or wrap it in quotes,
-    and a refusal that the UI fails to recognise gets rendered as though it were
-    a sourced answer — the one presentation that would be actively misleading.
+
+def is_refusal(text: str) -> bool:
+    """Whether an answer is *only* the 'not in the source material' response.
+
+    The comparison ignores punctuation, because models add a full stop, drop the
+    apostrophe, or wrap the sentence in quotes, and a refusal the UI fails to
+    recognise would be rendered as though it were sourced.
+
+    But it is deliberately not a substring test, and that distinction was
+    learned the hard way. Rule 6 of the prompt asks the model to answer the part
+    of a question the passages cover and say plainly what they do not — and one
+    model did exactly that, producing four cited paragraphs and then appending
+    the refusal sentence about the uncovered part. A substring match called the
+    whole thing a refusal and threw away every source card.
+
+    An answer that cites its sources must never be presented as though nothing
+    was found. So a refusal is the sentence and essentially nothing else.
     """
     squashed = "".join(c for c in text.lower() if c.isalnum())
-    return "".join(c for c in REFUSAL.lower() if c.isalnum()) in squashed
+    target = "".join(c for c in REFUSAL.lower() if c.isalnum())
+    return target in squashed and len(squashed) <= len(target) + _REFUSAL_SLACK

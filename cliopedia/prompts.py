@@ -52,7 +52,10 @@ add a preamble, do not restate the question, and do not mention "the passages" \
 or "the context" — write as though explaining the history itself.
 
 6. If the passages partly answer the question, answer the part they cover and \
-say plainly what they do not address. Do not fill the gap.\
+say plainly what they do not address, in your own words. Do not fill the gap. \
+Do NOT use the sentence from rule 2 in this case — that sentence is reserved \
+for when the passages answer nothing at all, and the application treats it as a \
+signal that no sources exist.\
 """
 
 # Kept separate from the system prompt so the passages and the question travel
