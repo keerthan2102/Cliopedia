@@ -55,16 +55,12 @@ def load_client():
 
 @st.cache_resource(show_spinner=False)
 def warm_the_model():
-    """Ask the model for one token, in the background, at startup.
+    """Ask the language model for one token, in the background, at startup.
 
-    Measured behaviour: the first question of a session is slow and every
-    question after it is quick. That gap is Ollama loading the model into
-    memory, a fixed cost that does not shrink with a smaller model — swapping
-    8B for 3B made generation much faster and left this untouched.
-
-    The cost cannot be removed, only moved. Spending it while the page is
-    painting and the reader is still typing is better than spending it after
-    they press Ask.
+    Secondary to warming the embeddings, but still worth doing: Ollama unloads
+    a model after five idle minutes by default, so a session returned to later
+    pays to load it again. Set OLLAMA_KEEP_ALIVE to change that — `ollama ps`
+    shows the deadline in its UNTIL column.
 
     On a daemon thread so nothing blocks the render, and failures are swallowed
     on purpose: a cold model means a slow first question, not a broken app, and
@@ -90,7 +86,6 @@ def warm_the_model():
 st.title("📚 Cliopedia")
 st.caption("Ask a history question — every answer cites its source.")
 
-# Started before the form so the model loads while the question is being typed.
 warm_the_model()
 
 with st.form("ask"):
@@ -100,6 +95,20 @@ with st.form("ask"):
         label_visibility="collapsed",
     )
     submitted = st.form_submit_button("Ask", type="primary")
+
+# Deliberately after the form, and deliberately on the main thread.
+#
+# This is the real cost of a first question. Loading all-MiniLM-L6-v2 means
+# importing PyTorch and reading ~90MB of weights — several seconds — and
+# @st.cache_resource then makes every later question skip it. That is precisely
+# the observed pattern: slow once, fast afterwards, and unchanged by swapping
+# the language model, because the language model was never the cause.
+#
+# Streamlit sends elements to the browser as the script produces them, so the
+# form is already on screen and typeable while this blocks. Doing it on a
+# background thread instead would leave the cache unpopulated for the main
+# thread, which is the only place it gets read.
+load_embeddings()
 
 if submitted and not question.strip():
     st.warning("Type a question first.")
