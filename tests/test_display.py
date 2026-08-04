@@ -56,7 +56,21 @@ def test_markers_are_emboldened():
 
 def test_every_marker_in_a_sentence_is_marked():
     out = highlight_markers("Napoleon relented [2], doubling the nation [1][3].")
-    assert out.count("**[") == 3
+    assert out == "Napoleon relented **[2]**, doubling the nation **[1][3]**."
+
+
+def test_adjacent_markers_are_wrapped_as_one_run():
+    """Bolding [2][4] separately yields ****, which Markdown prints literally.
+
+    Seen on screen: "became a reality [2]****[4]." — the bug this guards.
+    """
+    out = highlight_markers("a reality [2][4].")
+    assert out == "a reality **[2][4]**."
+    assert "****" not in out
+
+
+def test_three_adjacent_markers_stay_clean():
+    assert "****" not in highlight_markers("Drawn from all three [1][2][3].")
 
 
 def test_non_marker_brackets_are_left_alone():

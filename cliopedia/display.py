@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import re
 
-_MARKER = re.compile(r"\[(\d+)\]")
+# A run of one or more adjacent markers: [2] or [1][3] or [1][2][4].
+#
+# Matching the run rather than each marker matters. Emboldening them one at a
+# time turns "[2][4]" into "**[2]****[4]**", and Markdown cannot parse that
+# four-asterisk run — it renders the asterisks literally, which is exactly what
+# appeared on screen. Wrapping the whole run gives "**[2][4]**" instead.
+_MARKER_RUN = re.compile(r"((?:\[\d+\])+)")
 
 # Characters that can legitimately end a sentence, including the closing
 # quotation marks a textbook uses.
@@ -50,4 +56,4 @@ def highlight_markers(text: str) -> str:
     numbers carry the traceability requirement — the reader sees [2] in a
     sentence and finds the card headed [2] below.
     """
-    return _MARKER.sub(r"**[\1]**", text)
+    return _MARKER_RUN.sub(r"**\1**", text)

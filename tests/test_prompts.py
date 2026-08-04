@@ -206,3 +206,16 @@ def test_stream_transport_failure_is_actionable():
 
     with pytest.raises(generate.GenerationError, match="ollama serve"):
         list(generate.answer_stream("q", PASSAGES, client=Broken(), model="m"))
+
+
+def test_answer_length_is_capped():
+    """Generation cost is linear in tokens, so the ceiling bounds latency."""
+    client = _FakeClient()
+    generate.answer("q", PASSAGES, client=client, model="m")
+    assert client.seen["max_tokens"] == generate.MAX_ANSWER_TOKENS
+
+
+def test_streamed_answer_length_is_capped_too():
+    client = _FakeStreamClient(["x"])
+    list(generate.answer_stream("q", PASSAGES, client=client, model="m"))
+    assert client.seen["max_tokens"] == generate.MAX_ANSWER_TOKENS

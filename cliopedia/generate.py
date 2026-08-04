@@ -20,6 +20,16 @@ from cliopedia.retrieve import Retrieved
 # a conversational default either way.
 TEMPERATURE = 0.2
 
+# A ceiling on answer length, and therefore on how long a question can take.
+# Generation cost is linear in tokens produced, so this is the one lever in the
+# code — as opposed to the config — that bounds worst-case latency.
+#
+# Set generously rather than tightly. The prompt already asks for a few
+# sentences; this exists to stop a model that ignores that from rambling for a
+# minute. Lowering it trades completeness for speed, and a cut lands mid-
+# sentence, so tighten it only with the answers in front of you.
+MAX_ANSWER_TOKENS = 400
+
 
 class GenerationError(RuntimeError):
     """Raised when the model cannot be reached or returns nothing usable."""
@@ -65,6 +75,7 @@ def answer(
             model=model,
             messages=build_messages(question, passages),
             temperature=TEMPERATURE,
+            max_tokens=MAX_ANSWER_TOKENS,
         )
     except ConfigError:
         raise
@@ -117,6 +128,7 @@ def answer_stream(
             model=model,
             messages=build_messages(question, passages),
             temperature=TEMPERATURE,
+            max_tokens=MAX_ANSWER_TOKENS,
             stream=True,
         )
         for chunk in stream:
