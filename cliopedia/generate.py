@@ -84,6 +84,57 @@ def answer(
     return text
 
 
+def answer_stream(
+    question: str,
+    passages: Sequence[Retrieved],
+    client=None,
+    model: str | None = None,
+):
+    """Yield the answer piece by piece as the model produces it.
+
+    Same request as `answer()`, read incrementally. This changes nothing about
+    how long an answer takes — a language model emits one token at a time and
+    each depends on the last, so the total is fixed by the model's speed. What
+    it changes is how long the reader stares at nothing: first words in about a
+    second instead of a blank panel until the last token lands.
+
+    Citations cannot be attached until the text is complete, so the caller is
+    expected to accumulate what it yields and pass the whole answer to
+    `citations.attach` at the end.
+    """
+    if not passages:
+        yield REFUSAL
+        return
+
+    if client is None:
+        client, resolved = make_client()
+        model = model or resolved
+    if model is None:
+        raise GenerationError("No model specified and none resolved from config.")
+
+    try:
+        stream = client.chat.completions.create(
+            model=model,
+            messages=build_messages(question, passages),
+            temperature=TEMPERATURE,
+            stream=True,
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            piece = chunk.choices[0].delta.content
+            if piece:
+                yield piece
+    except ConfigError:
+        raise
+    except Exception as exc:  # the client raises a family of transport errors
+        raise GenerationError(
+            f"The model call failed: {type(exc).__name__}: {exc}\n"
+            "If running locally, check that `ollama serve` is up and that\n"
+            "LLM_BASE_URL matches it — see python -m cliopedia.config."
+        ) from exc
+
+
 def is_refusal(text: str) -> bool:
     """Whether an answer is the 'not in the source material' response.
 

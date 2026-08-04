@@ -147,3 +147,62 @@ def test_refusals_are_recognised_despite_punctuation(text):
 )
 def test_real_answers_are_not_mistaken_for_refusals(text):
     assert not generate.is_refusal(text)
+
+
+class _FakeStreamClient:
+    """A client whose completions arrive in pieces, like a real stream."""
+
+    def __init__(self, pieces):
+        self.pieces = pieces
+        self.seen: dict = {}
+        outer = self
+
+        class _Completions:
+            def create(self, **kwargs):
+                outer.seen = kwargs
+                def chunks():
+                    for piece in outer.pieces:
+                        delta = type("D", (), {"content": piece})()
+                        choice = type("C", (), {"delta": delta})()
+                        yield type("Ch", (), {"choices": [choice]})()
+                return chunks()
+
+        self.chat = type("Chat", (), {"completions": _Completions()})()
+
+
+def test_stream_yields_pieces_that_join_into_the_answer():
+    client = _FakeStreamClient(["The purchase ", "doubled the nation ", "[1]."])
+    out = "".join(generate.answer_stream("q", PASSAGES, client=client, model="m"))
+    assert out == "The purchase doubled the nation [1]."
+
+
+def test_stream_requests_streaming_from_the_api():
+    client = _FakeStreamClient(["x"])
+    list(generate.answer_stream("q", PASSAGES, client=client, model="m"))
+    assert client.seen["stream"] is True
+    assert client.seen["temperature"] == generate.TEMPERATURE
+
+
+def test_stream_skips_empty_deltas():
+    """Real streams emit chunks with no content — a role header, a final stop."""
+    client = _FakeStreamClient(["A", None, "", "B"])
+    assert "".join(generate.answer_stream("q", PASSAGES, client=client, model="m")) == "AB"
+
+
+def test_stream_refuses_without_calling_the_model_when_nothing_retrieved():
+    def exploding(*_a, **_k):
+        raise AssertionError("must not call the model with zero passages")
+
+    assert list(generate.answer_stream("q", [], client=exploding)) == [prompts.REFUSAL]
+
+
+def test_stream_transport_failure_is_actionable():
+    class Broken:
+        def __init__(self):
+            class _C:
+                def create(self, **_):
+                    raise ConnectionRefusedError("refused")
+            self.chat = type("Chat", (), {"completions": _C()})()
+
+    with pytest.raises(generate.GenerationError, match="ollama serve"):
+        list(generate.answer_stream("q", PASSAGES, client=Broken(), model="m"))

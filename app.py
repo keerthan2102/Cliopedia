@@ -18,7 +18,12 @@ import streamlit as st
 from cliopedia.citations import attach
 from cliopedia.config import ConfigError, settings
 from cliopedia.display import as_excerpt, highlight_markers
-from cliopedia.generate import GenerationError, answer, is_refusal, make_client
+from cliopedia.generate import (
+    GenerationError,
+    answer_stream,
+    is_refusal,
+    make_client,
+)
 from cliopedia.retrieve import RetrievalError, retrieve
 
 SOURCE_URL = "https://openstax.org/details/books/us-history"
@@ -64,9 +69,7 @@ elif submitted:
     try:
         with st.spinner("Searching the textbook…"):
             passages = retrieve(question, embeddings=load_embeddings())
-        with st.spinner("Reading the passages…"):
             client, model = load_client()
-            text = answer(question, passages, client=client, model=model)
     except ConfigError as exc:
         st.error("The app is not configured.")
         st.code(str(exc), language=None)
@@ -82,17 +85,34 @@ elif submitted:
 
     st.subheader("Answer")
 
+    # Streamed into a placeholder so the reader sees words within a second or
+    # two rather than a blank panel for the whole generation. The elapsed time
+    # is unchanged — a model emits tokens one at a time and each depends on the
+    # last — but waiting with something to read is a different experience.
+    answer_box = st.empty()
+    try:
+        text = answer_box.write_stream(
+            answer_stream(question, passages, client=client, model=model)
+        )
+    except GenerationError as exc:
+        answer_box.empty()
+        st.error("Could not reach the language model.")
+        st.code(str(exc), language=None)
+        st.stop()
+
     if is_refusal(text):
         # Deliberately no sources. Nothing supported an answer, so listing the
         # retrieved passages would invite the reader to treat them as evidence.
-        st.info(text)
+        answer_box.info(text)
         st.caption(
             "That is a correct answer, not a failure — this library covers one "
             "textbook, and saying so beats inventing a plausible date."
         )
     else:
         citations = attach(text, passages)
-        st.markdown(highlight_markers(text))
+        # Replace the streamed text with the same text, markers emboldened.
+        # Styling mid-stream would mean parsing half-written markers.
+        answer_box.markdown(highlight_markers(text))
 
         if not citations:
             # An answer nobody can check is the failure this project exists to
