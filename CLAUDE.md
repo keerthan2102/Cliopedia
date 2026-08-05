@@ -90,6 +90,10 @@ python -m cliopedia.ingest
 # Inspect retrieval on its own — no model needed, useful for debugging
 python -m cliopedia.retrieve "What caused the Louisiana Purchase?"
 
+# Measure retrieval against eval/questions.toml (P3)
+python -m cliopedia.evaluate
+python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,8,16
+
 # Ask a question from the terminal (P0)
 python -m cliopedia.ask "What caused the Louisiana Purchase?"
 python -m cliopedia.ask "..." --snippets    # show the verbatim passages

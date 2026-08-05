@@ -1,0 +1,66 @@
+# Cliopedia's retrieval question set.
+#
+# Each entry is a question plus the page numbers KNOWN to answer it. Running
+# `python -m cliopedia.evaluate` asks each question and checks whether one of
+# those pages came back in the top k. That is the retrieval hit rate — the one
+# number that says whether the search half of this system actually works.
+#
+# ── How to write a good entry ──────────────────────────────────────────────
+#
+# `pages`  PRINTED page numbers — the folio typeset on the page, not the PDF
+#          page. For this corpus the offset is 16, so PDF page 226 is printed
+#          page 210. The app reports printed pages, so the two match directly.
+#
+# `why`    How you verified it. Not decoration: in six months this is the only
+#          way to tell a checked entry from a guessed one.
+#
+# ── The trap to avoid ──────────────────────────────────────────────────────
+#
+# Do NOT write questions by running retrieval and recording what comes back.
+# That measures whether retrieval agrees with itself, which it always will, and
+# the score would be meaningless.
+#
+# Write them the other way round: open the PDF at a page, READ it, and write a
+# question that page answers. The gold page is then the page you read, chosen
+# independently of anything the system does.
+#
+# Spread the pages across the whole book. Twenty questions clustered in one
+# chapter measure one chapter.
+#
+# ── Worth including on purpose ─────────────────────────────────────────────
+#
+# A few questions whose answer spans two pages — list both, either counts.
+# A few asked in a student's words rather than the textbook's, since that is
+# how the app is actually used, and matching paraphrase is the whole reason
+# for using embeddings instead of keyword search.
+
+
+# ── Seeded entries ─────────────────────────────────────────────────────────
+# Three from this project's own history. The first is independently verified:
+# the printed page was read directly from the PDF and quoted. The other two
+# came from retrieval output and are marked as such — they are weaker evidence
+# and should be re-verified or replaced.
+
+[[question]]
+ask = "What caused the Louisiana Purchase?"
+pages = [210, 211]
+why = "Verified by reading PDF page 226 (printed 210): contains 'Perhaps the greatest real estate deal in American history, the Louisiana Purchase greatly enhanced the Jeffersonian vision'. Printed 211 continues 'The purchase of Louisiana came about largely because of circumstances beyond Jefferson's control'."
+
+[[question]]
+ask = "Why did Napoleon sell the Louisiana territory?"
+pages = [211]
+why = "UNVERIFIED — from retrieval output showing the Haiti revolt passage on printed 211. Confirm against the PDF before trusting this entry."
+
+[[question]]
+ask = "How did Theodore Roosevelt become president?"
+pages = [574]
+why = "UNVERIFIED — from retrieval output citing McKinley's assassination on printed 574. Confirm against the PDF."
+
+
+# ── Your entries below ─────────────────────────────────────────────────────
+# Aim for 15–20 total. Copy the block, fill it in, delete this comment.
+#
+# [[question]]
+# ask = "..."
+# pages = [000]
+# why = "Read printed page 000: '<a phrase from the page>'"
