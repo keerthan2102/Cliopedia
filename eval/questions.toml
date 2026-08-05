@@ -14,6 +14,10 @@
 # `why`    How you verified it. Not decoration: in six months this is the only
 #          way to tell a checked entry from a guessed one.
 #
+#          Use '''triple quotes''' for this one. Text pasted from a PDF wraps
+#          across lines and often contains quotation marks; a "..." string
+#          allows neither, and the file then fails to parse.
+#
 # ── The trap to avoid ──────────────────────────────────────────────────────
 #
 # Do NOT write questions by running retrieval and recording what comes back.
@@ -63,4 +67,5 @@ why = "UNVERIFIED — from retrieval output citing McKinley's assassination on p
 # [[question]]
 # ask = "..."
 # pages = [000]
-# why = "Read printed page 000: '<a phrase from the page>'"
+# why = '''Read printed page 000: "<a phrase from the page>",
+# which may wrap across as many lines as you like.'''

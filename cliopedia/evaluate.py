@@ -88,8 +88,23 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
             "to answer it. See the file's own comments for the format."
         )
 
-    with path.open("rb") as handle:
-        data = tomllib.load(handle)
+    try:
+        with path.open("rb") as handle:
+            data = tomllib.load(handle)
+    except tomllib.TOMLDecodeError as exc:
+        # This file is hand-edited, so a syntax slip is expected rather than
+        # exceptional, and tomllib's raw traceback buries the one useful fact —
+        # which line. The commonest cause by far is a `why` value pasted from a
+        # PDF: the text wraps, and a "..." string cannot span lines.
+        raise EvalError(
+            f"{path} is not valid TOML.\n"
+            f"  {exc}\n\n"
+            "Most often a value spans more than one line. A \"...\" string\n"
+            "cannot; use a triple-quoted literal instead, which also lets you\n"
+            "paste quotation marks without escaping them:\n\n"
+            "    why = \'\'\'Read printed page 421: \"a phrase from the page\",\n"
+            "    which may wrap across as many lines as you like.\'\'\'"
+        ) from exc
 
     entries = data.get("question", [])
     if not entries:

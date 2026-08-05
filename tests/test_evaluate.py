@@ -97,3 +97,27 @@ def test_a_question_with_no_expected_pages_is_rejected(tmp_path):
 def test_a_missing_question_file_explains_itself(tmp_path):
     with pytest.raises(EvalError, match="hand-written"):
         load_questions(tmp_path / "absent.toml")
+
+
+def test_a_multiline_value_explains_the_fix(tmp_path):
+    """The commonest hand-editing slip: a `why` pasted from a PDF wraps."""
+    bad = tmp_path / "questions.toml"
+    bad.write_text(
+        '[[question]]\nask = "Something?"\npages = [1]\n'
+        'why = "a line\nand another line"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(EvalError, match="triple-quoted"):
+        load_questions(bad)
+
+
+def test_a_triple_quoted_value_parses(tmp_path):
+    good = tmp_path / "questions.toml"
+    good.write_text(
+        '[[question]]\nask = "Something?"\npages = [1]\n'
+        "why = '''a line\nand another, with \"quotes\" in it'''\n",
+        encoding="utf-8",
+    )
+    questions = load_questions(good)
+    assert len(questions) == 1
+    assert "quotes" in questions[0].why
