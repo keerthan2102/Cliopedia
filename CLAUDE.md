@@ -28,6 +28,32 @@ citing printed page numbers, running locally against Ollama `llama3.1:8b`
 over 3775 chunks of the OpenStax corpus. **P1 (Streamlit UI) is built but
 not yet exercised by a human.** P2 is next.
 
+### Retrieval baseline — measured 2026-08-05
+
+The first real numbers, against the 15 hand-verified questions in
+`eval/questions.txt`, over 3775 chunks of the single-book corpus:
+
+| k | hit rate | MRR |
+|---|---|---|
+| 1 | 53.3% | 0.533 |
+| 2 | 66.7% | 0.600 |
+| 4 | 86.7% | 0.656 |
+| 5 | 93.3% | 0.669 |
+| **6** | **100.0%** | **0.680** |
+| 7, 8, 16 | 100.0% | 0.680 |
+
+`RETRIEVAL_K` is **6**, the smallest k that retrieves every known-correct
+page. Eight of fifteen questions put the right page at rank 1.
+
+**This is a floor, not a triumph.** Fifteen questions means one item is worth
+6.7 points, so 100% here says "no known question fails", not "retrieval is
+solved". Its value is as a regression check and as the **before** number for
+the corpus expansion — expanding to three books should push it down, and that
+movement is the measurement worth having.
+
+Re-run `python -m cliopedia.evaluate --sweep` after any change to the corpus,
+the chunking, or the embedding model, and update this table.
+
 ---
 
 ## 2. Tech stack — locked
@@ -92,7 +118,8 @@ python -m cliopedia.retrieve "What caused the Louisiana Purchase?"
 
 # Measure retrieval against eval/questions.txt (P3)
 python -m cliopedia.evaluate
-python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,8,16
+python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,6,8,16
+python -m cliopedia.evaluate -k 5           # one specific k
 
 # Ask a question from the terminal (P0)
 python -m cliopedia.ask "What caused the Louisiana Purchase?"
@@ -493,3 +520,53 @@ Format:
   by construction rather than validated after the fact. Reach for a bespoke
   line format when the alternative is teaching a person escaping rules.
 - **Date**: 2026-08-03
+
+### Rule 13: check the answer key before believing the score
+
+- **Trigger**: the first evaluation run scored **73.3% hit rate at k=4** with
+  four misses, and the obvious reading was "retrieval needs tuning". It did
+  not. Two of the four gold pages were **PDF page numbers written where
+  printed folios were required** — 230 instead of 214, 293 instead of 277,
+  each exactly the corpus's folio offset of 16 too high. `Retrieved.cite_page`
+  reports the printed folio, so the evaluator was asking retrieval to find
+  pages that do not exist in the units it reports, then marking it wrong when
+  it returned the correct page **at rank 1**. Corrected, the same index and
+  the same code scored **86.7%**. Nothing about retrieval changed.
+- **Correct behavior**: a retrieval metric is worth exactly what its answer
+  key is worth, and a wrong gold label is **indistinguishable from a broken
+  retriever** by the score alone — both print MISS. So when the number
+  disappoints, read the misses before touching a knob. Two tells, both cheap:
+  a miss whose retrieved pages sit a **constant offset** from the expected one
+  is a units bug, not a ranking bug; and a hit rate that **plateaus below
+  100% no matter how large k grows** means some gold page is unreachable at
+  any depth, which usually means it is not a real page.
+- **Why it matters more here than in most projects**: this repo carries two
+  page numbers per chunk on purpose (§8 Rule 10), so "page" is ambiguous
+  everywhere unless the unit is named. Anything comparing pages — the eval
+  set, a bug report, a citation screenshot — must say **which** numbering it
+  means. `eval/questions.txt` says so in its header; that was not enough,
+  because the number still gets read off a viewer's page box.
+- **The general point**: tuning against an unverified ground truth does not
+  merely waste effort, it **actively degrades the system** — every "gain"
+  moves retrieval toward returning the wrong page. Verify the ruler, then
+  measure. Recorded also because it makes a good interview answer: the first
+  eval run did not measure retrieval, it caught a bug in the measurement.
+- **Date**: 2026-08-05
+
+### Rule 14: a doubling sweep locates a plateau only to within a factor of two
+
+- **Trigger**: `SWEEP_K` was `(1, 2, 4, 8, 16)`. The corrected sweep read
+  86.7% at k=4 and 100% at k=8, flat thereafter — which invites "k=8 is where
+  recall tops out". It is not: **k=6 already reached 100%**, and 8 was merely
+  the first grid point past it. Setting `RETRIEVAL_K=8` off that curve would
+  have bought two extra passages of pure noise per query.
+- **Correct behavior**: when the quantity being read off a sweep is *where a
+  curve stops climbing*, the value that matters is the **first** k on the
+  plateau, and a geometric grid cannot resolve it. Find the bracket with the
+  coarse grid, then measure the integers inside it — `-k` takes a single
+  value, so this costs one command each. `SWEEP_K` now includes 6. A cheap
+  cross-check before running anything: MRR rising only slightly between two
+  grid points means the newly-found pages sit at low ranks, and dividing the
+  MRR delta by the number of newly-hit questions estimates those ranks
+  directly. Here it predicted ranks 5 and 6, and they were 5 and 6.
+- **Date**: 2026-08-05

@@ -123,9 +123,15 @@ def _load_settings() -> Settings:
         embedding_model=(os.getenv("EMBEDDING_MODEL") or "").strip()
         or "all-MiniLM-L6-v2",
         # How many chunks are retrieved and handed to the model. Too few starves
-        # the answer, too many dilutes the prompt with noise. A starting
-        # default, to be tuned against the evaluation harness at P3.
-        retrieval_k=_positive_int("RETRIEVAL_K", 4),
+        # the answer, too many dilutes the prompt with noise.
+        #
+        # 6, set from measurement rather than taste: on the 15-question set in
+        # eval/questions.txt, hit rate runs 86.7% at k=4, 93.3% at k=5 and
+        # 100% at k=6, then stays at 100% through k=7, 8 and 16. Six is the
+        # smallest k that retrieves every known-correct page, and paying for
+        # more passages past that buys no recall while giving the model more
+        # unrelated text to blend in unattributed.
+        retrieval_k=_positive_int("RETRIEVAL_K", 6),
     )
 
 

@@ -43,7 +43,14 @@ _FIELD = re.compile(r"^(ask|pages|why)\s*:\s*(.*)$", re.IGNORECASE)
 # The values of k to try in a sweep. Spans "only the best passage" to "far more
 # than a prompt should carry", so the curve shows where extra passages stop
 # adding recall and start adding noise.
-SWEEP_K = (1, 2, 4, 8, 16)
+#
+# 6 is in the grid because the original doubling sequence stepped straight over
+# it. That sweep reached 100% at k=8 and stayed there, which reads as "8 is
+# where recall tops out" — but 6 already reached 100%, and 8 was simply the
+# first measured point past it. A doubling grid can only ever locate the answer
+# to within a factor of two; when a plateau is what you are looking for, the
+# first k on the plateau is the one worth knowing, so it has to be measured.
+SWEEP_K = (1, 2, 4, 6, 8, 16)
 
 
 class EvalError(RuntimeError):
