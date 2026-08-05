@@ -56,6 +56,9 @@ ask: Why did many Americans oppose the 1787 constitution?
 pages: 195
 why: Read printed page 195: "several states made the passing of a bill of
   rights a condition of their acceptance of the Constitution".
+  RE-CHECKED against the PDF after the first eval run scored it a miss: 195
+  is correct. This is a real retrieval miss at k=4, not a bad gold page —
+  retrieval returned 176 to 188, the surrounding Constitution material.
 
 ask: How did Theodore Roosevelt become president?
 pages: 574
@@ -91,18 +94,25 @@ why: Read printed page 155: "The treaty recognized the independence of the
   in the waters off Newfoundland."
 
 ask: What prompted Francis Scott Key to write The Star Spangled Banner?
-pages: 230
-why: Read printed page 230: "After the British bombed Baltimore's Fort
-  McHenry in 1814 but failed to overcome the U.S. forces there, Francis
+pages: 214, 215
+why: Read printed pages 214 and 215: "After the British bombed Baltimore's
+  Fort McHenry in 1814 but failed to overcome the U.S. forces there, Francis
   Scott Key was inspired by the sight of the American flag, which remained
   hanging proudly in the aftermath."
+  CORRECTED from 230, which was the PDF page rather than the printed folio —
+  230 minus the offset of 16 is 214. The first eval run scored this a miss
+  while retrieval was returning 214 and 215 at ranks 1 and 2, i.e. it was
+  right and the answer key was wrong.
 
 ask: What made Jefferson think of establishing a river route from St. Louis to the Pacific Ocean?
-pages: 293
-why: Read printed page 293: "Jefferson wanted to improve the ability of
+pages: 277
+why: Read printed page 277: "Jefferson wanted to improve the ability of
   American merchants to access the ports of China. Establishing a river
   route from St. Louis to the Pacific Ocean was crucial to capturing a
   portion of the fur trade that had proven so profitable to Great Britain."
+  CORRECTED from 293, the PDF page rather than the printed folio — 293 minus
+  the offset of 16 is 277. Retrieval had been returning 277 at rank 1 and
+  scoring a miss against a gold page that did not exist.
 
 ask: What is the Second Great Awakening and what changes did it bring to American culture?
 pages: 334, 335
@@ -151,6 +161,11 @@ ask: What was President Hoover's foreign policy like?
 pages: 696
 why: Read printed page 696: "Hoover did help to usher in a period of
   positive relations, specifically with several Latin American neighbors."
+  RE-CHECKED against the PDF after the first eval run scored it a miss: 696
+  is correct. A real retrieval miss at k=4 — retrieval returned 695, 700 and
+  702, so it landed adjacent to the right page without hitting it. Chunks
+  never span pages here, so a paragraph running across the 695/696 boundary
+  is split in two, and the half carrying the meaning can sit on 695.
 
 ask: Why were Japanese subjected to racial discrimination during the 1930s?
 pages: 754
