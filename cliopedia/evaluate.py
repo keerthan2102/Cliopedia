@@ -15,7 +15,7 @@ for prompt space with three irrelevant ones.
     python -m cliopedia.evaluate
     python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,8,16
 
-The question set lives in eval/questions.toml, hand-written and version
+The question set lives in eval/questions.txt, hand-written and version
 controlled. Scoring lives here, in the package, so it can be imported and
 tested without a corpus.
 """
@@ -23,14 +23,22 @@ tested without a corpus.
 from __future__ import annotations
 
 import argparse
-import tomllib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 from cliopedia.config import REPO_ROOT, settings
 
-QUESTIONS_FILE = REPO_ROOT / "eval" / "questions.toml"
+QUESTIONS_FILE = REPO_ROOT / "eval" / "questions.txt"
+
+# A line starts a new field only if it opens with one of these. Anything else
+# continues the field above it, which is what lets `why` hold pasted prose —
+# quotation marks, apostrophes, wrapped lines — with no escaping rules at all.
+# The first format here was TOML, and it broke twice on exactly that: a
+# sentence copied out of the PDF. A file written by hand should not fail
+# because someone typed a quotation mark.
+_FIELD = re.compile(r"^(ask|pages|why)\s*:\s*(.*)$", re.IGNORECASE)
 
 # The values of k to try in a sweep. Spans "only the best passage" to "far more
 # than a prompt should carry", so the curve shows where extra passages stop
@@ -76,10 +84,16 @@ class Result:
 def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
     """Read the hand-written question set.
 
-    TOML rather than JSON because a question set is written and maintained by
-    hand, and needs comments explaining how each expected page was verified —
-    which JSON cannot carry. `tomllib` is in the standard library from Python
-    3.11, so this costs no dependency.
+    A deliberately plain line format rather than TOML, JSON or YAML. This file
+    is typed and edited by a person, and its `why` field holds sentences copied
+    straight out of a PDF — full of quotation marks, apostrophes and line
+    wraps. Every structured format has escaping rules that such text violates,
+    and TOML did: the first two attempts at writing this set failed to parse on
+    a pasted sentence.
+
+    So there are no quoting rules. `ask:`, `pages:` and `why:` start a field,
+    anything else continues the one above, a blank line ends an entry. Twenty
+    lines of parser buys a file that cannot be broken by typing in it.
     """
     if not path.exists():
         raise EvalError(
@@ -88,38 +102,61 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
             "to answer it. See the file's own comments for the format."
         )
 
-    try:
-        with path.open("rb") as handle:
-            data = tomllib.load(handle)
-    except tomllib.TOMLDecodeError as exc:
-        # This file is hand-edited, so a syntax slip is expected rather than
-        # exceptional, and tomllib's raw traceback buries the one useful fact —
-        # which line. The commonest cause by far is a `why` value pasted from a
-        # PDF: the text wraps, and a "..." string cannot span lines.
-        raise EvalError(
-            f"{path} is not valid TOML.\n"
-            f"  {exc}\n\n"
-            "Most often a value spans more than one line. A \"...\" string\n"
-            "cannot; use a triple-quoted literal instead, which also lets you\n"
-            "paste quotation marks without escaping them:\n\n"
-            "    why = \'\'\'Read printed page 421: \"a phrase from the page\",\n"
-            "    which may wrap across as many lines as you like.\'\'\'"
-        ) from exc
+    entries: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    field: str | None = None
 
-    entries = data.get("question", [])
+    for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.rstrip()
+        if not line.strip():
+            if current:
+                entries.append(current)
+            current, field = {}, None
+            continue
+        if line.lstrip().startswith("#"):
+            continue
+
+        match = _FIELD.match(line.strip())
+        if match:
+            field = match.group(1).lower()
+            current[field] = match.group(2).strip()
+        elif field:
+            current[field] = f"{current[field]} {line.strip()}".strip()
+        else:
+            raise EvalError(
+                f"{path} line {number}: expected 'ask:', 'pages:' or 'why:'\n"
+                f"  {line.strip()[:70]}\n"
+                "A continuation line must follow one of those; a blank line ends\n"
+                "an entry."
+            )
+
+    if current:
+        entries.append(current)
+
     if not entries:
-        raise EvalError(f"{path} contains no [[question]] entries.")
+        raise EvalError(f"{path} contains no questions.")
 
     questions = []
     for index, entry in enumerate(entries, start=1):
-        ask = (entry.get("ask") or "").strip()
-        pages = entry.get("pages") or []
+        ask = entry.get("ask", "").strip()
         if not ask:
-            raise EvalError(f"Question {index} has no 'ask'.")
-        if not pages:
-            raise EvalError(f"Question {index} ({ask!r}) lists no expected pages.")
+            raise EvalError(f"Entry {index} has no 'ask:' line.")
+
+        raw_pages = entry.get("pages", "")
+        numbers = re.findall(r"\d+", raw_pages)
+        if not numbers:
+            raise EvalError(
+                f"Entry {index} ({ask[:50]!r}) lists no pages.\n"
+                "Every question needs at least one page known to answer it —\n"
+                "without one it scores zero and looks like a retrieval failure."
+            )
+
         questions.append(
-            Question(ask=ask, pages=tuple(int(p) for p in pages), why=entry.get("why", ""))
+            Question(
+                ask=ask,
+                pages=tuple(int(n) for n in numbers),
+                why=entry.get("why", "").strip(),
+            )
         )
     return questions
 

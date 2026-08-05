@@ -90,7 +90,7 @@ python -m cliopedia.ingest
 # Inspect retrieval on its own — no model needed, useful for debugging
 python -m cliopedia.retrieve "What caused the Louisiana Purchase?"
 
-# Measure retrieval against eval/questions.toml (P3)
+# Measure retrieval against eval/questions.txt (P3)
 python -m cliopedia.evaluate
 python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,8,16
 
@@ -474,4 +474,22 @@ Format:
   both work rather than documenting the one that happens to. Fixed here with
   `pytest.ini` setting `pythonpath = .`, so `pytest` and `python -m pytest` are
   interchangeable from the repo root.
+- **Date**: 2026-08-03
+
+### Rule 12: a file a human types into needs no escaping rules
+
+- **Trigger**: the evaluation question set was TOML. Its `why` field holds
+  sentences copied out of the PDF — quotation marks, apostrophes, wrapped
+  lines — and a TOML `"..."` string permits none of those. The author's first
+  question set failed to parse, and so did the second, on exactly that.
+  Improving the error message did not help: the format was wrong for the job.
+- **Correct behavior**: `eval/questions.txt` is a plain line format —
+  `ask:` / `pages:` / `why:` start a field, any other line continues the one
+  above, a blank line ends an entry. No quoting, no escaping, nothing that
+  breaks when prose is pasted in. Twenty lines of parser in
+  `cliopedia/evaluate.py`.
+- **The general point**: structured formats are for machines writing to
+  machines. A file maintained by hand, holding free text, should be forgiving
+  by construction rather than validated after the fact. Reach for a bespoke
+  line format when the alternative is teaching a person escaping rules.
 - **Date**: 2026-08-03

@@ -88,36 +88,65 @@ def test_the_shipped_question_set_parses():
 
 def test_a_question_with_no_expected_pages_is_rejected(tmp_path):
     """An entry with no gold page silently scores zero and looks like a failure."""
-    bad = tmp_path / "questions.toml"
-    bad.write_text('[[question]]\nask = "Something?"\npages = []\n', encoding="utf-8")
-    with pytest.raises(EvalError, match="no expected pages"):
+    bad = tmp_path / "questions.txt"
+    bad.write_text("ask: Something?\npages:\n", encoding="utf-8")
+    with pytest.raises(EvalError, match="lists no pages"):
         load_questions(bad)
 
 
 def test_a_missing_question_file_explains_itself(tmp_path):
     with pytest.raises(EvalError, match="hand-written"):
-        load_questions(tmp_path / "absent.toml")
+        load_questions(tmp_path / "absent.txt")
 
 
-def test_a_multiline_value_explains_the_fix(tmp_path):
-    """The commonest hand-editing slip: a `why` pasted from a PDF wraps."""
-    bad = tmp_path / "questions.toml"
-    bad.write_text(
-        '[[question]]\nask = "Something?"\npages = [1]\n'
-        'why = "a line\nand another line"\n',
+def test_quotes_and_apostrophes_need_no_escaping(tmp_path):
+    """The whole reason this format is not TOML: pasted prose must just work."""
+    path = tmp_path / "questions.txt"
+    path.write_text(
+        'ask: What did Jefferson want?\n'
+        'pages: 210\n'
+        'why: Page 210 reads "an empire of liberty", and Jefferson\'s vision\n'
+        '  wrapped across lines — with dashes, \'quotes\' and = signs.\n',
         encoding="utf-8",
     )
-    with pytest.raises(EvalError, match="triple-quoted"):
-        load_questions(bad)
+    question = load_questions(path)[0]
+    assert '"an empire of liberty"' in question.why
+    assert "Jefferson's vision wrapped across lines" in question.why
 
 
-def test_a_triple_quoted_value_parses(tmp_path):
-    good = tmp_path / "questions.toml"
-    good.write_text(
-        '[[question]]\nask = "Something?"\npages = [1]\n'
-        "why = '''a line\nand another, with \"quotes\" in it'''\n",
-        encoding="utf-8",
+def test_a_blank_line_separates_entries(tmp_path):
+    path = tmp_path / "questions.txt"
+    path.write_text(
+        "ask: First?\npages: 1\n\nask: Second?\npages: 2\n", encoding="utf-8"
     )
-    questions = load_questions(good)
-    assert len(questions) == 1
-    assert "quotes" in questions[0].why
+    questions = load_questions(path)
+    assert [q.ask for q in questions] == ["First?", "Second?"]
+    assert [q.pages for q in questions] == [(1,), (2,)]
+
+
+def test_pages_accept_any_sane_separator(tmp_path):
+    """A hand-typed list should not care about spaces or commas."""
+    path = tmp_path / "questions.txt"
+    path.write_text("ask: Q?\npages: 210, 211  212\n", encoding="utf-8")
+    assert load_questions(path)[0].pages == (210, 211, 212)
+
+
+def test_comments_and_trailing_blank_lines_are_ignored(tmp_path):
+    path = tmp_path / "questions.txt"
+    path.write_text(
+        "# a note\n\nask: Q?\npages: 5\n# another note\n\n\n", encoding="utf-8"
+    )
+    assert len(load_questions(path)) == 1
+
+
+def test_a_stray_line_before_any_field_is_reported_with_its_number(tmp_path):
+    path = tmp_path / "questions.txt"
+    path.write_text("this is not a field\nask: Q?\npages: 1\n", encoding="utf-8")
+    with pytest.raises(EvalError, match="line 1"):
+        load_questions(path)
+
+
+def test_the_why_field_is_optional(tmp_path):
+    path = tmp_path / "questions.txt"
+    path.write_text("ask: Q?\npages: 7\n", encoding="utf-8")
+    assert load_questions(path)[0].why == ""
