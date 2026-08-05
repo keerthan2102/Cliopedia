@@ -52,21 +52,108 @@ why: Verified by reading PDF page 226 (printed 210), which contains "Perhaps
   purchase of Louisiana came about largely because of circumstances beyond
   Jefferson's control".
 
-ask: Why did Napoleon sell the Louisiana territory?
-pages: 211
-why: UNVERIFIED — taken from retrieval output showing the Haiti revolt passage
-  on printed 211. Confirm against the PDF before trusting this entry, or
-  delete it.
+ask: Why did many Americans oppose the 1787 constitution?
+pages: 195
+why: Read printed page 195: "several states made the passing of a bill of
+  rights a condition of their acceptance of the Constitution".
 
 ask: How did Theodore Roosevelt become president?
 pages: 574
-why: UNVERIFIED — taken from retrieval output citing McKinley's assassination
-  on printed 574. Confirm against the PDF, or delete it.
+why: Read printed page 574: "But when an assassin shot and killed President
+  McKinley in 1901 (Figure 21.16) at the Pan-American Exposition in Buffalo,
+  New York, Theodore Roosevelt unexpectedly became the youngest president in
+  the nation's history".
 
+ask: Who established the first European settlements in the Americas and how did they do it?
+pages: 33, 34
+why: Read printed page 33: "The Spanish established the first European
+  settlements in the Americas, beginning in the Caribbean and, by 1600,
+  extending throughout Central and South America." Read printed page 34:
+  "The marriage of Ferdinand of Aragon and Isabella of Castile in 1469
+  unified Catholic Spain and began the process of building a nation that
+  could compete for worldwide power."
 
-# ── Your entries below ─────────────────────────────────────────────────────
-# Aim for 15–20 total.
-#
-# ask: ...
-# pages: 000
-# why: Read printed page 000: "<a phrase from the page>"
+ask: Tell me about the Glorious Revolution and explain what caused it?
+pages: 93, 94
+why: Read printed page 93: "The Glorious Revolution spilled over into the
+  colonies. In 1689, Bostonians overthrew the government of the Dominion of
+  New England and jailed Sir Edmund Andros as well as other leaders of the
+  regime (Figure 4.8)." Read printed page 94: "The Glorious Revolution led
+  to the establishment of an English nation that limited the power of the
+  king and provided protections for English subjects."
+
+ask: What did the Treaty of Paris achieve?
+pages: 155
+why: Read printed page 155: "The treaty recognized the independence of the
+  United States; placed the western, eastern, northern, and southern
+  boundaries of the nation at the Mississippi River, the Atlantic Ocean,
+  Canada, and Florida, respectively; and gave New Englanders fishing rights
+  in the waters off Newfoundland."
+
+ask: What prompted Francis Scott Key to write The Star Spangled Banner?
+pages: 230
+why: Read printed page 230: "After the British bombed Baltimore's Fort
+  McHenry in 1814 but failed to overcome the U.S. forces there, Francis
+  Scott Key was inspired by the sight of the American flag, which remained
+  hanging proudly in the aftermath."
+
+ask: What made Jefferson think of establishing a river route from St. Louis to the Pacific Ocean?
+pages: 293
+why: Read printed page 293: "Jefferson wanted to improve the ability of
+  American merchants to access the ports of China. Establishing a river
+  route from St. Louis to the Pacific Ocean was crucial to capturing a
+  portion of the fur trade that had proven so profitable to Great Britain."
+
+ask: What is the Second Great Awakening and what changes did it bring to American culture?
+pages: 334, 335
+why: Read printed page 334: "The Second Great Awakening emphasized an
+  emotional religious style in which sinners grappled with their unworthy
+  nature before concluding that they were born again, that is, turning away
+  from their sinful past and devoting themselves to living a righteous,
+  Christ-centered life." Read printed page 335: "The Second Great Awakening
+  also brought significant changes to American culture. Church membership
+  doubled in the years between 1800 and 1835."
+
+ask: What happened at the First Battle of Bull Run and who gained the upper hand?
+pages: 393
+why: Read printed page 393: "On July 21, 1861, the two armies met near
+  Manassas, Virginia, along Bull Run Creek, only thirty miles from
+  Washington, DC. So great was the belief that this would be a climactic
+  Union victory that many Washington socialites and politicians brought
+  picnic lunches to a nearby area, hoping to witness history unfolding
+  before them."
+
+ask: What caused the cattle drives of the 1860s?
+pages: 454
+why: Read printed page 454: "The famous Chisholm Trail provided a quick
+  path from Texas to railroad terminals in Abilene, Wichita, and Dodge
+  City, Kansas, where cowboys would receive their pay."
+
+ask: How do you define Machine Politics, and how did they work in general?
+pages: 512, 513
+why: Read printed page 512: "The primary form of relief for working-class
+  urban Americans, and particularly immigrants, came in the form of machine
+  politics." Read printed page 513: "There, citizens knew their immediate
+  problems would be addressed in return for their promise of political
+  support in future elections."
+
+ask: What was the proposal of the Treaty of Versailles and who proposed it?
+pages: 633, 634
+why: Read printed page 633: "Referring to what became known as the
+  Fourteen Points, Wilson called for openness in all matters of diplomacy
+  and trade, specifically, free trade, freedom of the seas, an end to
+  secret treaties and negotiations, promotion of self-determination of all
+  nations, and more." Read printed page 634: "In the end, the Treaty of
+  Versailles that officially concluded World War I resembled little of
+  Wilson's original Fourteen Points."
+
+ask: What was President Hoover's foreign policy like?
+pages: 696
+why: Read printed page 696: "Hoover did help to usher in a period of
+  positive relations, specifically with several Latin American neighbors."
+
+ask: Why were Japanese subjected to racial discrimination during the 1930s?
+pages: 754
+why: Read printed page 754: "During the 1930s, Americans had caught
+  glimpses of Japanese armies in action and grew increasingly sympathetic
+  towards war-torn China."
