@@ -460,3 +460,18 @@ Format:
   page whose text matches the retrieved chunk. Both the number and the
   passage agree, so citations show the folio a reader actually sees.
 - **Date**: 2026-07-29
+
+### Rule 11: run the command in the exact form you document it
+
+- **Trigger**: §3 and the README both list `pytest`. Every verification run had
+  actually used `python -m pytest`. Those differ — the `-m` form puts the
+  working directory on `sys.path` and the bare command does not — so the
+  documented command failed with `ModuleNotFoundError: No module named
+  'cliopedia'` the first time the author ran it. A suite that passes or fails
+  depending on how it was invoked is worse than one that plainly fails.
+- **Correct behavior**: verify the *literal* command line that appears in the
+  docs, not a near-equivalent. Where two forms should both work, make them
+  both work rather than documenting the one that happens to. Fixed here with
+  `pytest.ini` setting `pythonpath = .`, so `pytest` and `python -m pytest` are
+  interchangeable from the repo root.
+- **Date**: 2026-08-03
