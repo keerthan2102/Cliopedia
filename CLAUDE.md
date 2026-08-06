@@ -79,9 +79,13 @@ then use it anyway unless told otherwise in the current message.
 citation title and source type per book. `scripts/download_sources.py` and
 `ingest.py` both read it, so a book cannot be fetchable but uncitable.
 `url = None` means **not yet established**, never a guess; the download script
-reports those and says where to get the link. World History Volumes 1 and 2 are
-registered and awaiting URLs, both confirmed CC BY-NC-SA 4.0 on 2026-08-05 from
-OpenStax's own `collections/*.collection.xml`.
+reports those and says where to get the link.
+
+All three books are registered with verified URLs. World History Volumes 1 and 2
+were confirmed **CC BY-NC-SA 4.0** on 2026-08-05 from OpenStax's own
+`collections/*.collection.xml`, and their PDFs `--inspect`ed on 2026-08-06
+before the links were written down — both structurally complete, both
+`Last-Modified 2026-04-21`, the same batch as *U.S. History*.
 
 ---
 
