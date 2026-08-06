@@ -27,26 +27,24 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = REPO_ROOT / "data" / "raw"
 
-# The OpenStax U.S. History PDF — the WEB edition, not the print one.
+# `python scripts/download_sources.py` puts scripts/ on sys.path, not the repo
+# root, so importing cliopedia would fail in exactly the form the README and
+# CLAUDE.md §3 document. Adding the root explicitly keeps the documented command
+# working rather than requiring `python -m scripts.download_sources` instead —
+# CLAUDE.md §8 Rule 11: verify the literal command line that appears in the docs.
+sys.path.insert(0, str(REPO_ROOT))
+
+from cliopedia import corpus  # noqa: E402  (import needs the path above)
+
+# Which books make up the corpus — their URLs, filenames and citation titles —
+# now lives in cliopedia/corpus.py, read by this script and by ingest.py alike.
+# It used to be a DEFAULT_URL here plus a separate SOURCES dict in ingest.py,
+# which meant adding a book required editing two files and forgetting the
+# second produced citations titled after the filename, silently.
 #
-# Confirmed 2026-07-29 with --inspect: 136,400,038 bytes, Last-Modified
-# 2026-04-21, tail ends "startxref\n216\n%%EOF\n". A structurally complete PDF.
-#
-# There is also a USHistory-OP.pdf at the same prefix. Do not use it. It returns
-# HTTP 200 and downloads happily, but the object is a stale 2016 upload
-# (Last-Modified 2016-04-29) truncated to 324,153,344 bytes — an exact multiple
-# of 4096 — with no %%EOF marker anywhere in its tail. It cost two full
-# downloads to discover. Resolving is not the same as being the right file.
-#
-# The WEB edition is also the right choice on the merits: less than half the
-# size, because this pipeline only ever extracts text and never needs
-# print-resolution imagery.
-#
-# If this link ever breaks, get the current one from the book's page and check
-# it with --inspect BEFORE downloading it:
-#     https://openstax.org/details/books/us-history
-DEFAULT_URL = "https://assets.openstax.org/oscms-prodcms/media/documents/US_History_-_WEB.pdf"
-DEFAULT_FILENAME = "openstax-us-history.pdf"
+# Only the fallback name for an ad-hoc --url fetch stays here: it belongs to
+# this script's escape hatch rather than to the corpus.
+DEFAULT_FILENAME = "openstax-download.pdf"
 
 # The licence this corpus must carry, per CLAUDE.md §8 Rule 3.
 EXPECTED_LICENCE = "CC BY-NC-SA 4.0"
@@ -104,9 +102,9 @@ def download(url: str, dest: Path) -> None:
         partial.unlink(missing_ok=True)
         raise SystemExit(
             f"\nHTTP {exc.code} fetching {url}\n\n"
-            "If OpenStax has moved the file, find the current PDF link on\n"
-            "https://openstax.org/details/books/us-history and re-run with\n"
-            "--url <link>, then fix DEFAULT_URL in this file."
+            "If OpenStax has moved the file, find the current PDF link on the\n"
+            "book's details page, check it with --url <link> --inspect, then\n"
+            "update that book's url= in cliopedia/corpus.py."
         ) from exc
     except urllib.error.URLError as exc:
         partial.unlink(missing_ok=True)
@@ -311,9 +309,49 @@ def inspect(url: str, path: Path) -> None:
     print(f"  last 60 bytes: {tail[-60:]!r}")
 
 
+def _report_pending(books) -> None:
+    """Say which registered books cannot be fetched yet, and how to fix that.
+
+    A book with no URL is not an error — it is a declared intention. Printing it
+    every run is what stops "we are expanding to three books" from quietly
+    staying a one-book corpus.
+    """
+    if not books:
+        return
+    print(f"\n{len(books)} book(s) registered but not yet fetchable — no URL set:")
+    for book in books:
+        print(f"  {book.key:<18} {book.title}")
+        print(f"  {'':<18} get the PDF link from {book.details_page}")
+    print(
+        "\nCheck a candidate link BEFORE downloading it:\n"
+        "  python scripts/download_sources.py --url <pdf-url> --inspect\n"
+        "then set url= for that book in cliopedia/corpus.py. An HTTP 200 is not\n"
+        "verification — see CLAUDE.md §8 Rule 7."
+    )
+
+
+def _fetch(book, force: bool) -> None:
+    """Download and verify one registered book, skipping what is already there."""
+    dest = RAW_DIR / book.filename
+    print(f"\n── {book.title} ─────────────────────────────")
+    if dest.exists() and not force:
+        print(f"{dest.relative_to(REPO_ROOT)} already exists — skipping. Use --force to refetch.")
+        report(dest)
+        return
+
+    download(book.url, dest)
+    verify_is_pdf(dest)
+    report(dest)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--url", default=DEFAULT_URL, help="PDF to fetch")
+    parser.add_argument(
+        "--book",
+        help="fetch one registered book by key: "
+        + ", ".join(b.key for b in corpus.CORPUS),
+    )
+    parser.add_argument("--url", help="fetch an arbitrary PDF instead of a registered book")
     parser.add_argument("--filename", default=DEFAULT_FILENAME, help="name under data/raw/")
     parser.add_argument(
         "--force", action="store_true", help="re-download even if the file exists"
@@ -325,21 +363,62 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if args.inspect:
-        inspect(args.url, RAW_DIR / args.filename)
-        return 0
-
-    dest = RAW_DIR / args.filename
-    if dest.exists() and not args.force:
-        print(f"{dest.relative_to(REPO_ROOT)} already exists — skipping. Use --force to refetch.")
+    # --url stays an escape hatch, and is what --inspect is normally pointed at:
+    # checking a candidate link is the step that happens *before* it is worth
+    # registering. Registered books take the same path once their URL is known.
+    if args.url:
+        if args.inspect:
+            inspect(args.url, RAW_DIR / args.filename)
+            return 0
+        dest = RAW_DIR / args.filename
+        if dest.exists() and not args.force:
+            print(f"{dest.relative_to(REPO_ROOT)} already exists — skipping. Use --force to refetch.")
+            report(dest)
+            return 0
+        download(args.url, dest)
+        verify_is_pdf(dest)
         report(dest)
+        print("\nNext: python -m cliopedia.ingest")
         return 0
 
-    download(args.url, dest)
-    verify_is_pdf(dest)
-    report(dest)
+    if args.book:
+        try:
+            book = corpus.find(args.book)
+        except KeyError as exc:
+            # exc.args[0], not str(exc): str() on a KeyError applies repr to the
+            # message and wraps the whole sentence in quotes.
+            print(f"\n{exc.args[0]}")
+            return 1
+        if book.pending:
+            print(f"\n{book.title} has no URL set yet.")
+            _report_pending([book])
+            return 1
+        if args.inspect:
+            inspect(book.url, RAW_DIR / book.filename)
+            return 0
+        books = [book]
+    else:
+        books = list(corpus.downloadable())
+        if args.inspect:
+            for entry in books:
+                inspect(entry.url, RAW_DIR / entry.filename)
+            _report_pending(corpus.pending())
+            return 0
 
-    print("\nNext: python -m cliopedia.ingest")
+    if not books:
+        print("No registered book has a URL set, so there is nothing to fetch.")
+        _report_pending(corpus.pending())
+        return 1
+
+    for book in books:
+        _fetch(book, force=args.force)
+
+    _report_pending(corpus.pending())
+
+    print(
+        f"\n{len(books)} of {len(corpus.CORPUS)} registered book(s) present in data/raw/."
+        "\nNext: python -m cliopedia.ingest --rebuild"
+    )
     return 0
 
 

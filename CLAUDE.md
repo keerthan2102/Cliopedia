@@ -75,6 +75,14 @@ then use it anyway unless told otherwise in the current message.
 | Tests | `pytest` |
 | Corpus | OpenStax *U.S. History*, CC BY-NC-SA 4.0 (see §8 Rule 3) |
 
+**The corpus is declared once, in `cliopedia/corpus.py`** — URL, filename,
+citation title and source type per book. `scripts/download_sources.py` and
+`ingest.py` both read it, so a book cannot be fetchable but uncitable.
+`url = None` means **not yet established**, never a guess; the download script
+reports those and says where to get the link. World History Volumes 1 and 2 are
+registered and awaiting URLs, both confirmed CC BY-NC-SA 4.0 on 2026-08-05 from
+OpenStax's own `collections/*.collection.xml`.
+
 ---
 
 ## 3. Commands
@@ -97,13 +105,16 @@ ollama pull llama3.1:8b
 ollama serve
 
 # Fetch the corpus into data/raw/  (git-ignored)
-# Verifies the %PDF- header AND the %%EOF marker, then prints page count
-# and the licence line off the PDF itself — read it.
+# Fetches every book in the registry whose URL is known, and names the ones
+# still waiting for a URL. Verifies the %PDF- header AND the %%EOF marker,
+# then prints page count and the licence line off the PDF itself — read it.
 python scripts/download_sources.py
-python scripts/download_sources.py --force        # refetch over an existing file
+python scripts/download_sources.py --force              # refetch existing files
+python scripts/download_sources.py --book us-history    # just one book
 
 # Check a candidate URL WITHOUT downloading it (see §8 Rule 7).
 # One HEAD plus a 128 KiB range request; costs seconds, not megabytes.
+# Do this before adding any URL to the registry.
 python scripts/download_sources.py --url <pdf-url> --inspect
 
 # Show the resolved configuration (API key redacted).

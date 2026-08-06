@@ -33,6 +33,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
+from cliopedia import corpus
 from cliopedia.config import REPO_ROOT, settings
 
 RAW_DIR = REPO_ROOT / "data" / "raw"
@@ -55,12 +56,16 @@ BATCH_SIZE = 500
 # rebuilt from scratch.
 COLLECTION_METADATA = {"hnsw:space": "cosine"}
 
-# Which document each file is, for citation purposes. One entry today; P2 adds
-# primary sources, which must be labelled distinctly from the textbook so the UI
-# can tell a student "this is a period document, read it critically".
-SOURCES: dict[str, tuple[str, str]] = {
-    "openstax-us-history.pdf": ("OpenStax U.S. History", "secondary"),
-}
+# Which document each file is, for citation purposes. Derived from the corpus
+# registry rather than written out here, so a book cannot be fetchable but
+# uncitable: an unregistered filename falls back to its stem in _describe(),
+# which produces a citation reading "openstax-world-history-volume-1" instead
+# of a title, and does so silently. One declaration, in cliopedia/corpus.py.
+#
+# P2 adds primary sources, which must be labelled distinctly from the textbook
+# so the UI can tell a student "this is a period document, read it critically".
+# That is the source_type field on Book; nothing here changes.
+SOURCES: dict[str, tuple[str, str]] = corpus.by_filename()
 
 
 def _display(path):
