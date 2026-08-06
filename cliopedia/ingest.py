@@ -86,6 +86,44 @@ class IngestError(RuntimeError):
     """Raised when the corpus or the index is not in a state we can build from."""
 
 
+def _remove_index(chroma_dir: Path) -> None:
+    """Delete the index directory, explaining a lock rather than dumping a trace.
+
+    On Windows a file cannot be deleted while another process holds it open, so
+    `shutil.rmtree` raises PermissionError (WinError 5) partway through. Two
+    things make that likely here and neither is exotic: a `streamlit run app.py`
+    left running keeps Chroma's SQLite file open, and this repo lives inside a
+    OneDrive folder, whose sync client opens files on its own schedule.
+
+    It matters more than an ugly traceback would suggest. rmtree deletes as it
+    walks, so a failure halfway leaves a **partially deleted index** — some
+    segments gone, the SQLite catalogue still referencing them. That is not an
+    empty directory and not a valid index, and `open_index()` cannot tell the
+    difference: it checks only that the directory is non-empty. So the run must
+    stop here with instructions, rather than continuing on wreckage.
+    """
+    try:
+        shutil.rmtree(chroma_dir)
+    except PermissionError as exc:
+        locked = getattr(exc, "filename", None) or chroma_dir
+        raise IngestError(
+            f"Could not delete the existing index — access denied on:\n"
+            f"  {locked}\n\n"
+            "Something else is holding a file open. Usually one of:\n"
+            "  - a `streamlit run app.py` still running (close it)\n"
+            "  - another python or pytest process using the index\n"
+            "  - OneDrive syncing this folder (pause sync, then retry)\n"
+            "  - the folder open in File Explorer or an editor\n\n"
+            "IMPORTANT: the index is now PARTLY deleted, so it is neither empty\n"
+            "nor valid, and querying it would give wrong or missing citations.\n"
+            "Delete the whole folder before rebuilding:\n"
+            f"  Windows:      rmdir /s /q {chroma_dir}\n"
+            f"  PowerShell:   Remove-Item -Recurse -Force '{chroma_dir}'\n"
+            f"  macOS/Linux:  rm -rf '{chroma_dir}'\n\n"
+            "Then re-run: python -m cliopedia.ingest --rebuild"
+        ) from exc
+
+
 def _describe(pdf: Path) -> tuple[str, str]:
     title, source_type = SOURCES.get(pdf.name, (pdf.stem, "secondary"))
     return title, source_type
@@ -235,7 +273,7 @@ def build_index(rebuild: bool = False, embeddings=None) -> int:
                 "silently degrading retrieval. Pass --rebuild to replace it."
             )
         print(f"Removing existing index at {_display(chroma_dir)}")
-        shutil.rmtree(chroma_dir)
+        _remove_index(chroma_dir)
 
         # Chroma caches one client per persist_directory for the lifetime of the
         # process. Deleting the directory does not evict that cache, so the next
