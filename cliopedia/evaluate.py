@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from cliopedia import corpus
 from cliopedia.config import REPO_ROOT, settings
 
 QUESTIONS_FILE = REPO_ROOT / "eval" / "questions.txt"
@@ -38,7 +39,7 @@ QUESTIONS_FILE = REPO_ROOT / "eval" / "questions.txt"
 # The first format here was TOML, and it broke twice on exactly that: a
 # sentence copied out of the PDF. A file written by hand should not fail
 # because someone typed a quotation mark.
-_FIELD = re.compile(r"^(ask|pages|why)\s*:\s*(.*)$", re.IGNORECASE)
+_FIELD = re.compile(r"^(ask|book|pages|why)\s*:\s*(.*)$", re.IGNORECASE)
 
 # The values of k to try in a sweep. Spans "only the best passage" to "far more
 # than a prompt should carry", so the curve shows where extra passages stop
@@ -59,24 +60,49 @@ class EvalError(RuntimeError):
 
 @dataclass(frozen=True)
 class Question:
-    """One question with the pages known to answer it.
+    """One question, the book that answers it, and the pages known to do so.
 
     `pages` are **printed** page numbers — the folio a reader sees — because
     that is what a person writing the question set reads off the page. It is
     also what `Retrieved.cite_page` reports, so the two are directly comparable.
+
+    `book` is a corpus key (`us-history`, `world-history-1`, …) and is
+    **required**, because a page number alone stopped identifying a passage the
+    moment the corpus held more than one book. Every volume has a page 210. A
+    World History page 210 returned for a U.S. History question is a retrieval
+    failure, but scored on the number alone it is indistinguishable from a hit —
+    and it inflates the score rather than depressing it, so nothing looks wrong.
+    See CLAUDE.md §8 Rule 15.
     """
 
     ask: str
+    book: str
     pages: tuple[int, ...]
     why: str = ""
+
+    @property
+    def source_title(self) -> str:
+        """The citation title of `book`, which is what retrieval reports.
+
+        Derived from the registry rather than stored, so the question set and
+        the citations can never disagree about what a book is called.
+        """
+        return corpus.find(self.book).title
 
 
 @dataclass(frozen=True)
 class Result:
-    """How retrieval did on one question."""
+    """How retrieval did on one question.
+
+    `retrieved` holds (source title, printed page) pairs rather than bare page
+    numbers. The book travels with the page all the way into the report,
+    because reading the misses is how a measurement bug gets caught (Rule 13),
+    and a miss printed without its book hides the very confusion this pairing
+    exists to prevent.
+    """
 
     question: Question
-    retrieved_pages: tuple[int, ...]
+    retrieved: tuple[tuple[str, int], ...]
     rank: int | None  # 1-based rank of the first correct page, None if missed
 
     @property
@@ -98,9 +124,9 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
     and TOML did: the first two attempts at writing this set failed to parse on
     a pasted sentence.
 
-    So there are no quoting rules. `ask:`, `pages:` and `why:` start a field,
-    anything else continues the one above, a blank line ends an entry. Twenty
-    lines of parser buys a file that cannot be broken by typing in it.
+    So there are no quoting rules. `ask:`, `book:`, `pages:` and `why:` start a
+    field, anything else continues the one above, a blank line ends an entry.
+    Twenty lines of parser buys a file that cannot be broken by typing in it.
     """
     if not path.exists():
         raise EvalError(
@@ -131,7 +157,7 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
             current[field] = f"{current[field]} {line.strip()}".strip()
         else:
             raise EvalError(
-                f"{path} line {number}: expected 'ask:', 'pages:' or 'why:'\n"
+                f"{path} line {number}: expected 'ask:', 'book:', 'pages:' or 'why:'\n"
                 f"  {line.strip()[:70]}\n"
                 "A continuation line must follow one of those; a blank line ends\n"
                 "an entry."
@@ -149,6 +175,26 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
         if not ask:
             raise EvalError(f"Entry {index} has no 'ask:' line.")
 
+        book = entry.get("book", "").strip()
+        known = ", ".join(b.key for b in corpus.CORPUS)
+        if not book:
+            raise EvalError(
+                f"Entry {index} ({ask[:50]!r}) has no 'book:' line.\n"
+                "Every volume in the corpus has a page 210, so a page number on\n"
+                "its own no longer identifies a passage. Name the book the gold\n"
+                f"pages were read from. Known keys: {known}"
+            )
+        try:
+            corpus.find(book)
+        except KeyError:
+            raise EvalError(
+                f"Entry {index} ({ask[:50]!r}) names an unknown book {book!r}.\n"
+                f"Known keys: {known}\n"
+                "A key that matches nothing would match no retrieved passage\n"
+                "either, so every question in this book would score a miss and\n"
+                "look like a retrieval failure."
+            ) from None
+
         raw_pages = entry.get("pages", "")
         numbers = re.findall(r"\d+", raw_pages)
         if not numbers:
@@ -161,6 +207,7 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
         questions.append(
             Question(
                 ask=ask,
+                book=book,
                 pages=tuple(int(n) for n in numbers),
                 why=entry.get("why", "").strip(),
             )
@@ -168,19 +215,27 @@ def load_questions(path: Path = QUESTIONS_FILE) -> list[Question]:
     return questions
 
 
-def score(question: Question, retrieved_pages: Sequence[int]) -> Result:
-    """Rank of the first retrieved page known to answer the question.
+def score(question: Question, retrieved: Sequence[tuple[str, int]]) -> Result:
+    """Rank of the first retrieved passage known to answer the question.
+
+    `retrieved` is (source title, printed page) pairs, and **both** must match.
+    Matching on the page alone was correct only while the corpus held one book;
+    with three, page 210 exists in all of them, and a World History passage
+    returned for a U.S. History question would have scored a hit. That error
+    inflates the number, which is the dangerous direction — a retriever that
+    looks better than it is invites tuning in the wrong direction, and nothing
+    in the output says so.
 
     Deliberately generous about *which* correct page is found: an answer often
     spans a page boundary, so finding either counts. Deliberately strict about
     rank — position matters, and averaging that in is what MRR is for.
     """
     rank = None
-    for position, page in enumerate(retrieved_pages, start=1):
-        if page in question.pages:
+    for position, (title, page) in enumerate(retrieved, start=1):
+        if title == question.source_title and page in question.pages:
             rank = position
             break
-    return Result(question=question, retrieved_pages=tuple(retrieved_pages), rank=rank)
+    return Result(question=question, retrieved=tuple(retrieved), rank=rank)
 
 
 def hit_rate(results: Sequence[Result]) -> float:
@@ -200,8 +255,34 @@ def evaluate(questions: Sequence[Question], k: int, embeddings=None) -> list[Res
     results = []
     for question in questions:
         hits = retrieve(question.ask, k=k, embeddings=embeddings)
-        results.append(score(question, [hit.cite_page for hit in hits]))
+        results.append(
+            score(question, [(hit.source_title, hit.cite_page) for hit in hits])
+        )
     return results
+
+
+def _key_for(title: str) -> str:
+    """A book's short key, for report lines that would wrap under its full title."""
+    for book in corpus.CORPUS:
+        if book.title == title:
+            return book.key
+    return title
+
+
+def _describe(retrieved: Sequence[tuple[str, int]]) -> str:
+    """Retrieved pages grouped under their book, in the order they came back.
+
+    Printed with the book attached because a bare list of page numbers is what
+    made a wrong-book hit unreadable in the first place. When a question misses,
+    "which book did it go to instead" is usually the whole diagnosis.
+    """
+    grouped: dict[str, list[int]] = {}
+    for title, page in retrieved:
+        grouped.setdefault(title, []).append(page)
+    return "; ".join(
+        f"{_key_for(title)} {', '.join(str(p) for p in pages)}"
+        for title, pages in grouped.items()
+    ) or "nothing"
 
 
 def _report(results: Sequence[Result], k: int) -> None:
@@ -211,8 +292,10 @@ def _report(results: Sequence[Result], k: int) -> None:
         mark = f"rank {result.rank}" if result.hit else "MISS"
         print(f"  {mark:<8} {result.question.ask[:52]:<54}")
         if not result.hit:
-            print(f"           expected {list(result.question.pages)}, "
-                  f"got {list(result.retrieved_pages)}")
+            question = result.question
+            expected = ", ".join(str(p) for p in question.pages)
+            print(f"           expected {question.book} {expected}")
+            print(f"           got      {_describe(result.retrieved)}")
     print("─" * 78)
     print(f"  hit rate @{k}          {hit_rate(results):.1%}")
     print(f"  mean reciprocal rank  {mean_reciprocal_rank(results):.3f}")

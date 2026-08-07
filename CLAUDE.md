@@ -585,3 +585,43 @@ Format:
   MRR delta by the number of newly-hit questions estimates those ranks
   directly. Here it predicted ranks 5 and 6, and they were 5 and 6.
 - **Date**: 2026-08-05
+
+### Rule 15: an identifier that was unique yesterday is not unique after the corpus grows
+
+- **Trigger**: `evaluate()` retrieved `Retrieved` objects that each know their
+  `source_title`, then threw it away — `score(question, [hit.cite_page for hit
+  in hits])` — and `score()` matched bare integers. Correct for exactly as long
+  as the corpus held one book. Every volume has a page 210, so the moment the
+  two World History volumes were registered, a World History page 210 returned
+  for a U.S. History question would have scored a **hit at rank 1**. Confirmed
+  against the old scorer before the fix, not assumed: pure-wrong-book results
+  scored rank 1, and a wrong-book page 210 stole rank 1 from the real one.
+- **Why this one is nastier than Rule 13**: both are answer-key bugs, but they
+  run in opposite directions. A wrong gold page prints MISS — it depresses the
+  score, and a disappointing number gets investigated. A wrong-**book** hit
+  prints a rank and **raises** the number. Nothing looks wrong, so nothing gets
+  looked at, and every subsequent tuning decision is made against a score that
+  is partly counting noise as signal. **Prefer the failure mode that complains.**
+- **Correct behavior**: `score()` takes `(source_title, printed_page)` pairs and
+  both must match. `eval/questions.txt` carries a required `book:` field holding
+  a corpus key, validated against `cliopedia/corpus.py` at load time — a missing
+  or unknown key is refused with the valid keys listed, never defaulted. `Result`
+  carries the book all the way into `_report`, so a miss prints *which book
+  retrieval went to instead*, which is usually the whole diagnosis. The book
+  is named per entry rather than as a file-level default: Rule 13's lesson was
+  that an ambiguous unit is what lets a bad measurement pass unnoticed, and a
+  default hundreds of lines above the entry is an ambiguous unit.
+- **The general point, worth more than the bug**: this project deliberately
+  carries two page numbers per chunk (Rule 10) and now three books, so "page
+  210" has never been a complete address and is now actively ambiguous. When
+  the corpus, the schema, or the key space **grows**, re-audit every place that
+  compares identifiers — the code does not break, it silently starts agreeing
+  with the wrong thing. Ask of any equality test: *was this unique because of a
+  property I still have, or because there only used to be one of them?*
+- **Not fixed here, and still open**: `cite_page` falls back to the PDF page
+  when `printed_page` is `-1` (folio offset unestablished). U.S. History's
+  offset is 16; the World History volumes' offsets are unknown until ingest runs
+  on them. If one fails to establish, that book's pages come back in PDF units
+  while `questions.txt` is in printed units and every question for it MISSes —
+  loud, and therefore the safe direction, but check the ingest output for it.
+- **Date**: 2026-08-07
