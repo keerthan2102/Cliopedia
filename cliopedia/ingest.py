@@ -28,6 +28,7 @@ weaker signal here than they look.
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 from collections import Counter
 from pathlib import Path
@@ -129,13 +130,39 @@ def _describe(pdf: Path) -> tuple[str, str]:
     return title, source_type
 
 
+# A folio sitting at the end of a running footer, e.g.
+#   "9.3 • The Kingdom of Kush     391"
+# The digits must be preceded by whitespace (or start the line) and must end it,
+# so "FIGURE 9.17" does not read as folio 17 — the character before those digits
+# is a full stop, not a space.
+_TRAILING_FOLIO = re.compile(r"(?:^|\s)(\d{1,4})$")
+
+
 def _folio(page_text: str) -> int | None:
     """The page number *printed on* this page, if it shows one.
 
     Looked for in the last line first and the first line second, because that is
-    where a folio is typeset. Anything that is not a bare number is ignored —
-    guessing here would be worse than declining, since a confidently wrong page
-    reference is exactly the failure this project exists to prevent.
+    where a folio is typeset.
+
+    Two shapes count. A line that is nothing but the number is the classic case.
+    The number ending a running footer is the case that matters here, because it
+    is what OpenStax actually prints:
+
+        4.5 • Wars for Empire     105
+        9.3 • The Kingdom of Kush     391
+
+    Requiring the whole line to be digits missed every one of those. It found
+    folios on 6 of U.S. History's 987 pages — the handful whose footer carried
+    no section title — and on 0 of World History Volume 1's 791. That was enough
+    to squeak past the vote threshold for one book and fail outright for the
+    other, so the corpus expansion arrived with two volumes whose printed pages
+    were unknown and one whose offset rested on six pages.
+
+    Still deliberately narrow. A trailing number that is *not* a folio (a year
+    ending a sentence, a figure number) produces one stray vote, and
+    `_folio_offset` discards it by majority. Guessing remains worse than
+    declining: a confidently wrong page reference is the failure this project
+    exists to prevent.
     """
     lines = [line.strip() for line in page_text.splitlines() if line.strip()]
     if not lines:
@@ -143,6 +170,9 @@ def _folio(page_text: str) -> int | None:
     for candidate in (lines[-1], lines[0]):
         if candidate.isdigit() and 0 < int(candidate) < 10_000:
             return int(candidate)
+        match = _TRAILING_FOLIO.search(candidate)
+        if match and 0 < int(match.group(1)) < 10_000:
+            return int(match.group(1))
     return None
 
 
@@ -154,6 +184,15 @@ def _folio_offset(page_texts: list[str]) -> int | None:
     trust any single page's folio — a stray number in a table would do — every
     detected folio votes on the offset, and the winner is accepted only if a
     clear majority of detections agree.
+
+    Note what that majority is over: **detections, not pages.** Those are very
+    different denominators, and conflating them is how the offset of 16 came to
+    be described as well-established when it rested on 6 of 987 pages. The
+    minimum of five votes is the only thing standing between a near-total
+    detection failure and a confident wrong answer — World History Volume 2
+    detected exactly one folio and voted for an offset of 404, and only that
+    floor rejected it. If detections are ever a small fraction of a book's
+    pages, treat the offset as suspect even when the majority looks unanimous.
 
     Returning None is a valid, safe answer: it means "this book's layout defeats
     the heuristic", and the caller then records no printed page at all rather
