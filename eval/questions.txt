@@ -9,6 +9,7 @@
 # ── The format ─────────────────────────────────────────────────────────────
 #
 #   ask:    the question, phrased as a student would ask it
+#   book:   which book the gold pages were read from — a corpus key
 #   pages:  printed page numbers, comma separated
 #   why:    how you verified it — free text, any characters, any length
 #
@@ -16,9 +17,26 @@
 #
 # There are NO quoting rules. Paste anything into `why`: quotation marks,
 # apostrophes, dashes, text that wraps across five lines. A continuation line
-# is simply any line that does not begin with `ask:`, `pages:` or `why:`.
-# This file is written by hand, so it is designed not to break when you type
-# in it.
+# is simply any line that does not begin with `ask:`, `book:`, `pages:` or
+# `why:`. This file is written by hand, so it is designed not to break when you
+# type in it.
+#
+# `book` is one of the keys declared in cliopedia/corpus.py — currently
+# `us-history`, `world-history-1`, `world-history-2`. It is REQUIRED, and an
+# unknown key is rejected rather than ignored.
+#
+#
+# ── Why `book` is not optional ──────────────────────────────────────────────
+#
+# Every volume in this corpus has a page 210. While the corpus was one book a
+# page number identified a passage on its own; with three it does not. Scoring
+# on the page alone, a World History page 210 returned for a U.S. History
+# question counts as a HIT — the wrong book, scored correct.
+#
+# Note which way that error runs. It makes the number go UP. A gold page that
+# is simply wrong shows up as a miss and provokes an investigation; a wrong-book
+# hit shows up as success and provokes nothing. So the book is written down
+# next to the pages, per entry, where it can be read.
 #
 #
 # ── The trap to avoid ──────────────────────────────────────────────────────
@@ -32,8 +50,12 @@
 # independently of anything the system does.
 #
 # `pages` are PRINTED page numbers — the folio typeset on the page, not the
-# PDF page. For this corpus the offset is 16, so PDF page 226 is printed page
-# 210. The app reports printed pages, so the two compare directly.
+# PDF page. The app reports printed pages, so the two compare directly.
+#
+# The offset between the two is per book, because it comes from that book's own
+# front matter. For U.S. History it is 16, so PDF page 226 is printed page 210.
+# Do not carry that 16 across to another volume — read each book's own offset
+# off its pages, or let ingest print it.
 #
 # Spread the pages across the whole book. Twenty questions clustered in one
 # chapter measure one chapter.
@@ -45,6 +67,7 @@
 
 
 ask: What caused the Louisiana Purchase?
+book: us-history
 pages: 210, 211
 why: Verified by reading PDF page 226 (printed 210), which contains "Perhaps
   the greatest real estate deal in American history, the Louisiana Purchase
@@ -53,6 +76,7 @@ why: Verified by reading PDF page 226 (printed 210), which contains "Perhaps
   Jefferson's control".
 
 ask: Why did many Americans oppose the 1787 constitution?
+book: us-history
 pages: 195
 why: Read printed page 195: "several states made the passing of a bill of
   rights a condition of their acceptance of the Constitution".
@@ -61,6 +85,7 @@ why: Read printed page 195: "several states made the passing of a bill of
   retrieval returned 176 to 188, the surrounding Constitution material.
 
 ask: How did Theodore Roosevelt become president?
+book: us-history
 pages: 574
 why: Read printed page 574: "But when an assassin shot and killed President
   McKinley in 1901 (Figure 21.16) at the Pan-American Exposition in Buffalo,
@@ -68,6 +93,7 @@ why: Read printed page 574: "But when an assassin shot and killed President
   the nation's history".
 
 ask: Who established the first European settlements in the Americas and how did they do it?
+book: us-history
 pages: 33, 34
 why: Read printed page 33: "The Spanish established the first European
   settlements in the Americas, beginning in the Caribbean and, by 1600,
@@ -77,6 +103,7 @@ why: Read printed page 33: "The Spanish established the first European
   could compete for worldwide power."
 
 ask: Tell me about the Glorious Revolution and explain what caused it?
+book: us-history
 pages: 93, 94
 why: Read printed page 93: "The Glorious Revolution spilled over into the
   colonies. In 1689, Bostonians overthrew the government of the Dominion of
@@ -86,6 +113,7 @@ why: Read printed page 93: "The Glorious Revolution spilled over into the
   king and provided protections for English subjects."
 
 ask: What did the Treaty of Paris achieve?
+book: us-history
 pages: 155
 why: Read printed page 155: "The treaty recognized the independence of the
   United States; placed the western, eastern, northern, and southern
@@ -94,6 +122,7 @@ why: Read printed page 155: "The treaty recognized the independence of the
   in the waters off Newfoundland."
 
 ask: What prompted Francis Scott Key to write The Star Spangled Banner?
+book: us-history
 pages: 214, 215
 why: Read printed pages 214 and 215: "After the British bombed Baltimore's
   Fort McHenry in 1814 but failed to overcome the U.S. forces there, Francis
@@ -105,6 +134,7 @@ why: Read printed pages 214 and 215: "After the British bombed Baltimore's
   right and the answer key was wrong.
 
 ask: What made Jefferson think of establishing a river route from St. Louis to the Pacific Ocean?
+book: us-history
 pages: 277
 why: Read printed page 277: "Jefferson wanted to improve the ability of
   American merchants to access the ports of China. Establishing a river
@@ -115,6 +145,7 @@ why: Read printed page 277: "Jefferson wanted to improve the ability of
   scoring a miss against a gold page that did not exist.
 
 ask: What is the Second Great Awakening and what changes did it bring to American culture?
+book: us-history
 pages: 334, 335
 why: Read printed page 334: "The Second Great Awakening emphasized an
   emotional religious style in which sinners grappled with their unworthy
@@ -125,6 +156,7 @@ why: Read printed page 334: "The Second Great Awakening emphasized an
   doubled in the years between 1800 and 1835."
 
 ask: What happened at the First Battle of Bull Run and who gained the upper hand?
+book: us-history
 pages: 393
 why: Read printed page 393: "On July 21, 1861, the two armies met near
   Manassas, Virginia, along Bull Run Creek, only thirty miles from
@@ -134,12 +166,14 @@ why: Read printed page 393: "On July 21, 1861, the two armies met near
   before them."
 
 ask: What caused the cattle drives of the 1860s?
+book: us-history
 pages: 454
 why: Read printed page 454: "The famous Chisholm Trail provided a quick
   path from Texas to railroad terminals in Abilene, Wichita, and Dodge
   City, Kansas, where cowboys would receive their pay."
 
 ask: How do you define Machine Politics, and how did they work in general?
+book: us-history
 pages: 512, 513
 why: Read printed page 512: "The primary form of relief for working-class
   urban Americans, and particularly immigrants, came in the form of machine
@@ -148,6 +182,7 @@ why: Read printed page 512: "The primary form of relief for working-class
   support in future elections."
 
 ask: What was the proposal of the Treaty of Versailles and who proposed it?
+book: us-history
 pages: 633, 634
 why: Read printed page 633: "Referring to what became known as the
   Fourteen Points, Wilson called for openness in all matters of diplomacy
@@ -158,6 +193,7 @@ why: Read printed page 633: "Referring to what became known as the
   Wilson's original Fourteen Points."
 
 ask: What was President Hoover's foreign policy like?
+book: us-history
 pages: 696
 why: Read printed page 696: "Hoover did help to usher in a period of
   positive relations, specifically with several Latin American neighbors."
@@ -168,6 +204,7 @@ why: Read printed page 696: "Hoover did help to usher in a period of
   is split in two, and the half carrying the meaning can sit on 695.
 
 ask: Why were Japanese subjected to racial discrimination during the 1930s?
+book: us-history
 pages: 754
 why: Read printed page 754: "During the 1930s, Americans had caught
   glimpses of Japanese armies in action and grew increasingly sympathetic
