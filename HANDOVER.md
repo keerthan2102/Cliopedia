@@ -1,60 +1,44 @@
 # HANDOVER.md
 
 Relay baton for the next session. **Read this, act on it, then delete it** —
-that is the convention this file follows (see README §Project documents, and
-commit `1f06fc7`, which removed the last one after pickup).
+that is the convention (README §Project documents; commit `1f06fc7` removed an
+earlier one after pickup, and this file replaces one deleted the same way).
 
-Written 2026-08-07. `main` is at **`b9f8d0e`**. Working tree clean.
+Written 2026-08-10. `main` is at **`dd8a889`**. Working tree clean.
 
-Read `CLAUDE.md` first — it is the working agreement and it overrides anything
-here. This file only carries what `CLAUDE.md` cannot know yet.
+Read `CLAUDE.md` first — it is the working agreement and overrides anything
+here. This file carries only what `CLAUDE.md` cannot know yet.
 
 ---
 
 ## 1. What this session accomplished
 
-Two bugs fixed, both in the measurement layer, both found by preparing the
-corpus expansion rather than by running it. Both merged to `main`.
+The corpus expansion, end to end: one book → three, with the measurement to
+show what it cost. Eight commits, all merged to `main` via PRs #3–#10.
 
-### PR #3 — `f8a5ccb` — retrieval scoring was book-blind
+| commit | what |
+|---|---|
+| `f8a5ccb` | fix: score retrieval on book and page, not page alone |
+| `16b292b` | fix: read the folio off a running footer, not only a bare line |
+| `091e2ab` | feat: rebuild the index over all three books |
+| `b4080e5` | docs: record the three-book retrieval baseline |
+| `4372209` | docs: settle RETRIEVAL_K at 6, record where the real waste is |
+| `4d9fba6` | test: cover World History in the question set |
+| `ecb87ee` | docs: add a day-to-day run section to the README |
 
-`evaluate()` retrieved `Retrieved` objects that each know their `source_title`,
-then discarded it and scored bare page numbers. Correct only while the corpus
-held one book. Every volume has a page 210, so once the World History volumes
-are ingested, a World History page 210 returned for a U.S. History question
-would have scored a **hit at rank 1**.
+Two bugs found by *preparing* the expansion rather than by running it:
 
-Confirmed against the old scorer rather than assumed:
+**Book-blind scoring.** `evaluate()` threw away `source_title` and matched bare
+page numbers. Every volume has a page 210, so a World History page 210 returned
+for a U.S. History question would have scored a **hit at rank 1**. Confirmed
+against the old scorer, not assumed. → Rule 15.
 
-| retrieved | old rank | new rank |
-|---|---|---|
-| World History 210, 211 only | 1 (hit) | miss |
-| World History 210 ahead of U.S. History 210 | 1 | 2 |
-
-Fixed: `score()` takes `(source_title, printed_page)` pairs, both must match.
-`eval/questions.txt` gained a **required `book:` field** holding a corpus key,
-validated against `cliopedia/corpus.py` at load time. `Result` carries the book
-into `_report`, so a miss now prints which book retrieval went to instead.
-Recorded as **CLAUDE.md §8 Rule 15**.
-
-### PR #4 — `16b292b` — `_folio()` could not see OpenStax's folios
-
-`_folio()` required a line to be *entirely* digits. OpenStax prints the folio at
-the end of a running footer: `9.3 • The Kingdom of Kush     391`. So detection
-was near-total failure that looked like success.
-
-| book | before | after | offset |
-|---|---|---|---|
-| us-history | 6/987 detected | 472/987 | **16** (unchanged) |
-| world-history-1 | 0/791 → None | 390/791 | **10** |
-| world-history-2 | 1/723 → voted 404, rejected | 356/723 | **10** |
-
-Validated on the corpus, not fixtures: **600 of 600 sampled pages** (200 per
-book) have PDF index minus offset equal to the folio typeset on that page. The
-new matcher independently reproduces U.S. History's known-correct 16.
-
-New `tests/test_folio.py` (16 tests), built from footer strings copied verbatim
-out of the PDFs. Suite is at **128 passing**.
+**`_folio()` could not see OpenStax's folios.** It required a whole line to be
+digits; OpenStax prints `9.3 • The Kingdom of Kush     391`. Detection was
+6/987 pages on U.S. History and 0/791 on World History Vol 1. The offset of 16
+was correct but rested on six pages. Fixed to accept a folio trailing a running
+footer: detection 472/987, same answer 16. Both World History volumes resolve to
+**10**. Verified 600/600 sampled pages.
 
 ---
 
@@ -62,112 +46,110 @@ out of the PDFs. Suite is at **128 passing**.
 
 ### Works, verified this session
 
-- **Full test suite: 128 passing**, under both `pytest` and `python -m pytest`.
-- **`requirements.txt` is fine.** Installs and imports cleanly in a fresh venv:
-  `transformers 5.14.1 / tokenizers 0.22.2`. (An earlier apparent conflict was
-  caused by this session polluting system Python with `--ignore-installed`; it
-  was **not** a repo bug. Do not "fix" `requirements.txt`.)
-- **All three PDFs fetch and verify.** Structural check (`%PDF-` + `%%EOF` +
-  exact byte count) and licence read off each PDF's own front matter:
+- **128 tests pass**, under both `pytest` and `python -m pytest`.
+- **Index committed and live**: 9275 chunks, 84 MB, `chroma.sqlite3` 69 MB
+  (clears GitHub's 100 MB per-file limit). Folio offsets 16 / 10 / 10.
+- **All three licences read off the PDFs themselves**: CC BY-NC-SA 4.0.
+- **`eval/questions.txt` is 30 questions**: 15 us-history, 8 world-history-1,
+  7 world-history-2.
+- **`requirements.txt` resolves and imports cleanly** in a fresh venv
+  (`transformers 5.14.1 / tokenizers 0.22.2`). Do not "fix" it.
+- The author has the app running on Windows against the committed index.
 
-  | book | bytes | pages | licence |
-  |---|---|---|---|
-  | us-history | 136,400,038 | 987 | CC BY-NC-SA 4.0 ✅ |
-  | world-history-1 | 201,039,307 | 791 | CC BY-NC-SA 4.0 ✅ |
-  | world-history-2 | 132,663,448 | 723 | CC BY-NC-SA 4.0 ✅ |
+### The numbers that matter
 
-- **Folio offsets established for all three books**: 16, 10, 10.
+Retrieval at the configured **k=6**, 3775 → 9275 chunks:
 
-### Half-done / not started
+| k | hit rate (1 book) | hit rate (3 books) | MRR (1 book) | MRR (3 books) |
+|---|---|---|---|---|
+| 4 | 86.7% | **60.0%** | 0.656 | 0.517 |
+| 6 | **100.0%** | 86.7% | 0.680 | 0.568 |
+| 15 | — | 100.0% | — | 0.579 |
 
-- **The index has never been built with three books.** `data/chroma/` does not
-  exist. This is the next step (§3).
-- **`eval/questions.txt` still holds only the 15 U.S. History questions.** No
-  World History questions exist yet. All 15 now carry `book: us-history`.
-- **The recorded baseline in `CLAUDE.md` §1 is still the single-book number**
-  (100% @ k=6, MRR 0.680). It is *still valid* — both fixes are no-ops for the
-  one-book case — but it will need re-measuring and updating after ingest.
+Per book at k=6, over the 30-question set:
+
+| book | questions | hit rate | MRR |
+|---|---|---|---|
+| us-history | 15 | 86.7% | 0.568 |
+| world-history-1 | 8 | 100.0% | 0.875 |
+| world-history-2 | 7 | 100.0% | 0.738 |
+
+**The expansion cost real accuracy on U.S. History, but the new books are
+retrievable.** So the problem is interference and *ranking*, not reachability.
 
 ### Broken / open
 
-- **`data/chroma/` has NEVER been committed**, though `SPEC.md` §4.1, the
-  README licence table, `CLAUDE.md` §5 and `.gitignore`'s own comment all state
-  it is a committed build artifact that the P3 deployment plan depends on.
-  `git log --all -- 'data/chroma*'` is empty. **This needs a decision before
-  deploy** — see §5.
-- **P1 (Streamlit UI) has still never been used by a human.** That is P1's own
-  exit criterion and it remains unmet. Needs Ollama, so it needs the author's
-  machine.
-- **A stale remote branch may exist**: `claude/project-overview-qlfp0c`. This
-  environment gets **HTTP 403 from the proxy on branch deletion** — it is a
-  policy denial, not a transient failure, so do not burn retries on it. Ask the
-  author to delete it on GitHub.
+- **A real hallucination is on record and unfixed.** Asked "Tell me about the
+  Roman conquest of Britain", the app produced a cited answer containing:
+  *"unlike in Gaul, the Romans did not have a permanent presence in Britain
+  until the late first century CE."* World History Vol 1 p.297 dates it to
+  **43 CE**; the phrase "late first century" appears nowhere, and the page's
+  "Unlike the case in Gaul" attaches to centuriation and roads being direct
+  control, not to the permanent presence. Everything else in that answer checked
+  out against pp.297 and 423. **The author reports this was produced on
+  `llama3.1:8b`, not the smaller model — so it is not a small-model artifact and
+  points at `cliopedia/prompts.py`.** Reproduce before changing anything.
+- **P1 (Streamlit UI) still has no completed human pass.** The author is using
+  it, but the exit criterion — a stranger can use it unaided and verify any
+  claim — has not been formally signed off.
+- **The World History gold pages have not been human-verified.** They were
+  written from `pypdf`-extracted text, not the rendered page, so a caption or
+  sidebar could sit between quoted sentences. Rule 13: an unverified answer key
+  is worth nothing.
+- **Stale branches** `claude/corpus-expansion` and
+  `claude/project-overview-qlfp0c` may still exist on `origin`. The author said
+  they would delete them. **Branch deletion is HTTP 403 from this environment** —
+  a policy denial, not a transient failure. Do not burn retries on it.
 
 ---
 
 ## 3. Exact next steps
 
-### Step 1 — build the three-book index
+### Step 1 — reproduce the grounding failure (highest value)
 
 ```bash
-python -m cliopedia.ingest --rebuild
+python -m cliopedia.ask "Tell me about the Roman conquest of Britain?" --snippets
 ```
 
-`--rebuild` is required: an existing index built from one book must not be
-appended to. Watch the output for the **folio offset per book** — it must print
-16, 10, 10. Anything else means something regressed in `cliopedia/ingest.py`.
+Check whether the "late first century CE" claim recurs. If it does, the fix
+belongs in `cliopedia/prompts.py` — the grounding instruction is not holding the
+model to the passage. Read the current prompt before editing; §4.4 of
+`CLAUDE.md` is the governing rule (never let the model fall back on memory).
 
-Then record two numbers the author needs:
+This is the most valuable open thread: it is a live instance of the exact
+failure the project exists to prevent, on the locked model, with the evidence
+already gathered.
 
-```bash
-du -sh data/chroma/
-find data/chroma -size +50M -exec ls -lh {} \;   # any file near GitHub's 100MB cap
-```
+### Step 2 — attack ranking, not k
 
-### Step 2 — measure interference against the existing 15 questions
+`RETRIEVAL_K` is settled at **6** and should stay there absent new evidence
+(see §1 of `CLAUDE.md` for why raising it is tuning to the test). The measured
+levers, in order of cheapness:
+
+- **Page-level dedup — 23% of slots are wasted.** At k=6, 90 slots return only
+  69 distinct pages, so k=6 delivers **4.6 pages of evidence, not 6**. Dedup
+  would give ~6 distinct pages from a depth of about 8. Not implemented on
+  purpose: two chunks from one page can carry different content and the UI shows
+  a snippet per chunk, so it changes what a source card means. **Design decision,
+  needs the author.**
+- **Chunking.** For the Glorious Revolution question the gold page (93–94) sits
+  *behind* `us-history` 107 and 92 — retrieval lands adjacent to the right
+  passage and ranks neighbours above it.
+- **Reranking / hybrid search.** MRR is 0.568 and barely moves with k. That is
+  the number to move.
+
+Re-run after any change and update the tables in `CLAUDE.md` §1:
 
 ```bash
 python -m cliopedia.evaluate --sweep
 python -m cliopedia.evaluate -k 6
 ```
 
-This measures **interference**: does adding ~1,500 pages of world history push
-the right U.S. History page out of the top 6? It needs **no new questions**, and
-it is the genuine before/after that `CLAUDE.md` §1 is set up for. The `before`
-is 100% hit rate / 0.680 MRR at k=6.
+### Step 3 — verify the World History gold pages
 
-**A drop is the expected, interesting result — not a failure.** `CLAUDE.md` §1
-says so explicitly: "expanding to three books should push it down, and that
-movement is the measurement worth having."
-
-Re-run the k sweep and, if the plateau moved, follow **Rule 14**: find the
-bracket with the coarse grid, then measure the integers inside it with `-k`.
-`RETRIEVAL_K` is currently **6** (`cliopedia/config.py:134`).
-
-Then update the baseline table in `CLAUDE.md` §1 ("Retrieval baseline") with the
-new numbers and note that the corpus is now three books.
-
-### Step 3 — World History eval questions
-
-`eval/questions.txt`, following the format documented in its own header. Each
-entry needs `ask:` / `book:` / `pages:` / `why:`.
-
-- `book:` must be `world-history-1` or `world-history-2` — validated against
-  `cliopedia/corpus.py`, unknown keys are refused.
-- `pages:` are **printed folios**, not PDF pages. Offset is **10** for both
-  volumes, so PDF page 121 is printed page 111.
-- Read the trap section in the file's header: do **not** write questions by
-  running retrieval and recording what comes back. Open the PDF at a page, read
-  it, write a question that page answers.
-- The author should spot-check a sample — the question set's whole value is that
-  a human verified it (Rule 13).
-
-### Blocked on the author's machine (needs Ollama)
-
-- `python -m cliopedia.ask "..."` — the LLM answer path
-- `streamlit run app.py` — the P1 UI, and P1's unmet exit criterion
-
-The **retrieval eval needs no LLM**, so steps 1–2 run fine in a container.
+Spot-check 4–5 entries in `eval/questions.txt` (the block after the
+`── World History ──` comment) against the actual PDFs. Each `why:` field quotes
+the page verbatim, so this is a read, not a rerun.
 
 ---
 
@@ -175,79 +157,90 @@ The **retrieval eval needs no LLM**, so steps 1–2 run fine in a container.
 
 | Decision | Why |
 |---|---|
-| `book:` as a **required per-entry field**, not a file-level default | A default hundreds of lines above an entry is exactly the ambiguous unit Rule 13 warns about. Chosen over an inline `pages: us-history 210` form, which is actively unsafe: `world-history-1` contains a digit that the page parser would swallow. |
-| Fix `_folio()` rather than declare offsets in `corpus.py` | It reproduces the one known-correct answer (16) with a 76× stronger majority, works for future books, and needs no hand-maintained data. A per-book manual offset was the alternative and is still a reasonable fallback if a future book defeats the heuristic. |
-| Fix the scorer **before** expanding the corpus | Otherwise the post-expansion number would be unauditable — wrong-book hits inflate it, so a reassuring result would be indistinguishable from a real one. |
-| Establish folio offsets **before** writing World History questions | Both volumes came back "not established". Had questions been drafted first, all 15 would have been written in a numbering the app could not report, and the eval would have shown catastrophic retrieval failure that was really a units bug. |
-| Left `CLAUDE.md` Rule 10's confidence claim alone | It says the offset of 16 was established "with a clear majority of pages agreeing". It was 6 of 987 — a majority of *detections*. The correction is in the `_folio_offset` docstring; amending a **learned rule** is the author's call. |
-| Did not touch `requirements.txt` | The apparent conflict was self-inflicted (see §2). Verified clean in a fresh venv before concluding. |
+| `book:` as a **required per-entry field** in `eval/questions.txt` | A file-level default is exactly the ambiguous unit Rule 13 warns about. An inline `pages: us-history 210` form was rejected as unsafe: `world-history-1` contains a digit the page parser would swallow. |
+| Fix `_folio()` rather than declare offsets in `corpus.py` | It reproduces the one known-correct answer (16) with a 76× stronger majority and needs no hand-maintained data. Per-book manual offsets remain the fallback if a future book defeats the heuristic. |
+| Fix the scorer **before** expanding the corpus | Wrong-book hits inflate the score, so a reassuring post-expansion number would have been indistinguishable from a real one. |
+| Establish folio offsets **before** writing World History questions | Both volumes initially came back "not established". Questions drafted first would have been written in a numbering the app could not report. |
+| **`RETRIEVAL_K` stays 6** | 13 of 15 questions have identical ranks at k=6, 10 and 15. Going to 15 costs nine passages per query to fix two questions found at ranks 10 and 15. |
+| Commit the index | First time it has been, despite four documents describing it as committed. `SPEC.md` §4.1 requires it — Streamlit Cloud has no database. 69 MB clears GitHub's limit. |
+| Did **not** touch `requirements.txt` | An apparent `tokenizers`/`transformers` conflict was self-inflicted by `--ignore-installed` in system Python. Verified clean in a fresh venv first. |
+| Left Rule 10's confidence claim alone | It says the offset of 16 was established "with a clear majority of pages agreeing"; it was 6 of 987 — a majority of *detections*. The factual correction is in the `_folio_offset` docstring. Amending a **learned rule** is the author's call. **Still open.** |
 
 ---
 
 ## 5. Gotchas the next agent absolutely needs
 
+**Reading the index modifies it.** After any query or eval, `git status` shows
+`data/chroma/chroma.sqlite3` modified. SQLite rewrites its header on open;
+content is identical (verified by hashing 9275 embedding rows and 64,925
+metadata rows). Run `git checkout -- data/chroma/`. **Never commit that churn** —
+69 MB of meaningless history each time. Only commit the index after a genuine
+`python -m cliopedia.ingest --rebuild`. This is Rule 16 and it fired repeatedly
+this session, including via the stop hook.
+
 **The container is ephemeral.** `data/raw/` (470 MB) and `venv/` (5.8 GB) are
-both git-ignored and **will be gone** in a fresh session. Rebuild with
-`python -m venv venv && ./venv/bin/pip install -r requirements.txt` and
-`python scripts/download_sources.py`. Budget for it — the venv install pulls
-PyTorch.
+git-ignored and vanish in a fresh session. You do **not** need them to query —
+the index is committed. You need them only to re-ingest.
 
-**Downloads truncate. Retry.** U.S. History needed three attempts, Volume 2 two,
-all failing around 120–130 MB. `download_sources.py` correctly detects the short
-read, deletes the partial, and says to re-run — a truncated file is never kept.
-Just loop until the byte count matches. It is not a size cap: Volume 1 is the
-largest at 201 MB and came down whole.
+**Downloads truncate; just retry.** U.S. History took three attempts, Volume 2
+two, failing around 120–130 MB. `download_sources.py` detects the short read,
+deletes the partial, and says to re-run. Not a size cap — Volume 1 is largest at
+201 MB and came down whole. Loop until the byte count matches.
 
-**Do not run `pip install` in parallel with anything else.** This session did,
-and it churned `site-packages` mid-run, breaking `_cffi_backend` so `pypdf`
-failed to import and `download_sources.py` **silently skipped its licence
-check**. The download itself is unaffected (the byte/`%%EOF` checks are pure
-Python), but the licence evidence was lost and had to be re-gathered. Work in
-the venv, sequentially.
+**Never run `pip install` in parallel with other work.** Doing so churned
+`site-packages` mid-run, broke `_cffi_backend`, and made `download_sources.py`
+silently skip its licence check. The downloads were fine; the licence evidence
+was lost and had to be re-gathered.
 
-**`download_sources.py` skips files that already exist.** Re-running it will
-*not* re-verify a licence. To check a PDF already on disk, call
-`report()` / `verify_is_pdf()` directly, and pass an **absolute** path —
-`report()` does `path.relative_to(REPO_ROOT)` and raises `ValueError` on a
-relative one.
+**`download_sources.py` skips existing files**, so re-running it does not
+re-verify a licence. Call `report()` / `verify_is_pdf()` directly, and pass an
+**absolute** path — `report()` does `relative_to(REPO_ROOT)` and raises on a
+relative one. Its progress meter also assumes a TTY: filter with
+`grep -av "MB /"` or a 470 MB fetch produces a 42 KB log.
 
-**Its progress meter assumes a TTY.** Piped to a file it emits one line per
-0.1 MB; a 470 MB fetch produced a 42 KB log. Filter with `grep -av "MB /"`.
+**The eval CLI reloads the embedding model per invocation.** For multi-k work,
+build `HuggingFaceEmbeddings(model_name=settings.embedding_model)` once and pass
+it via `evaluate(qs, k=k, embeddings=emb)`. Turns 45 minutes into a few.
 
-**Two page numberings, always name which.** `locator_value` is the PDF page;
-`printed_page` is the folio; `cite_page` prefers the folio and **falls back to
-the PDF page** when `printed_page` is `-1`. Offsets are now 16 / 10 / 10, so the
-fallback should not trigger — but if a future book's offset fails to establish,
-that book's pages come back in PDF units while `questions.txt` is in printed
-units and every question for it MISSes. Loud, therefore safe, but check ingest's
-output.
+**The five-vote floor in `_folio_offset()` is load-bearing.** World History
+Vol 2 detected exactly one folio and voted *unanimously* for offset 404. Only
+that floor rejected it. If detections are a small fraction of a book's pages,
+treat the offset as suspect however unanimous the majority looks.
 
-**The five-vote floor in `_folio_offset()` is load-bearing.** World History Vol 2
-detected exactly one folio and voted *unanimously* for an offset of 404. Only
-that floor rejected it. If detections are ever a small fraction of a book's
-pages, treat the offset as suspect even when the majority looks unanimous.
+**Two page numberings — always name which.** `locator_value` is the PDF page,
+`printed_page` the folio, `cite_page` prefers the folio and falls back to the
+PDF page when `printed_page` is `-1`. Offsets are 16 / 10 / 10 so the fallback
+should not trigger.
 
-**`load_pages()` drops image-only pages.** 987 PDF pages → 985 Documents for
-U.S. History. Expected; `page_index` is still the true PDF page because the
-enumerate runs before the filter.
+**Do not compare hit rate across books.** The World History questions were
+written by a different author using distinctive proper nouns (*Çatalhöyük*,
+*cartaz*, *Songhai*); the U.S. History ones are paraphrased into a student's
+voice, which is harder. MRR 0.875 vs 0.568 measures question style at least as
+much as retrieval. The aggregate row also rose 86.7% → 93.3% purely because
+easier items joined the set. **Track per-book rows over time.**
 
-**Committing the index has a licence consequence.** `data/chroma/` embeds
-verbatim textbook passages, so it ships under **CC BY-NC-SA 4.0**, not the
-repo's MIT `LICENSE`. Never relicense it, and never make the deployed demo
-commercial. Also check the sqlite file against GitHub's 100 MB per-file hard
-limit before committing — if it exceeds that, the P3 deploy plan needs
-rethinking, not just a bigger commit.
+**The author develops on Windows.** Never hand over a bare `source` line.
+PowerShell blocks `Activate.ps1` under the default execution policy; the
+friction-free path is calling the venv executable directly
+(`.\venv\Scripts\streamlit.exe run app.py`). This is documented in the README's
+new "Running it day to day" section.
 
-**Branching.** `CLAUDE.md` §5 says `main` is the trunk and all work lands there.
-The author confirmed this session: commit to `main`, no feature branches. When a
-harness forces a branch, open a PR into `main` and **merge it before the session
-ends** — never leave work stranded. Both PRs this session (#3, #4) were merged
-that way. Note that a merged PR cannot be reused: start a fresh branch from
-`origin/main` for follow-up work.
+**`.env` drifts silently.** The author's local `.env` was running
+`RETRIEVAL_K=4` and `llama3.2:3b` — both stale, and k=4 is now the *worst* point
+on the curve (60.0%). `.env.example` is correct. `python -m cliopedia.config` is
+the first thing to run when behaviour surprises you.
+
+**Branching.** `CLAUDE.md` §5: `main` is the trunk, no feature branches. When a
+harness forces one, open a PR into `main` and **merge it before the session
+ends**. A merged PR cannot be reused — start a fresh branch from `origin/main`
+for follow-up work. **Watch for stranded commits**: resetting a branch to
+`origin/main` mid-session left the index commit behind on another branch this
+session, and `main` briefly carried the measurements without the index that
+produced them. Verify with `git ls-files`, not the log.
 
 **Commit messages: no backticks** inside a double-quoted `-m` string — bash runs
-command substitution and silently eats the word (Rule 5). Use `git commit -F`.
-Read the message back with `git log -1 --format=%B`.
+command substitution and eats the word (Rule 5). Use `git commit -F` and read
+back with `git log -1 --format=%B`.
 
 **`SPEC.md` is read-only.** It still says CC BY 4.0 and `k = 4`; both are
-superseded. Corrections live in `CLAUDE.md` §8, not in `SPEC.md`.
+superseded. Corrections live in `CLAUDE.md` §8.
