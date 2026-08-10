@@ -52,13 +52,40 @@ configured k=6, hit rate fell 100% → 86.7%. The worst damage is at k=4:
 number — the correct pages did not merely get crowded out, they got
 **out-ranked** by world-history passages that do not answer the question.
 
-**`RETRIEVAL_K` is still 6 and now under-performs.** The old policy — smallest
-k that retrieves every known-correct page — would now select **15**. That is
-2.5× the passages per query, and MRR is essentially flat from k=8 to k=16
-(0.568 → 0.579), so those extra passages buy recall without buying ranking.
-Whether to pay that, settle for 93.3% at k=10, or leave k alone and attack
-ranking directly (chunking, reranking, hybrid search) is **an open decision,
-not yet made.** Do not change `RETRIEVAL_K` without deciding it deliberately.
+**`RETRIEVAL_K` stays at 6 — decided 2026-08-10, deliberately.** The old policy
+(smallest k retrieving every known-correct page) would now select 15. The
+per-question view says not to pay it: **13 of 15 questions have identical ranks
+at k=6, 10 and 15.** Going 6→15 costs nine extra passages on every query to fix
+two questions, found at ranks 10 and 15 — deep enough to be buried anyway. On a
+15-question set where one item is worth 6.7 points, that is tuning to the test.
+
+| | k=6 | k=10 | k=15 |
+|---|---|---|---|
+| hit rate | 86.7% | 93.3% | 100.0% |
+| MRR | 0.568 | 0.574 | 0.579 |
+| questions whose rank changed | — | 1 | 2 |
+
+**Where the real waste is: 23% of retrieval slots are duplicate pages.**
+Several chunks from one page rank together, and each copy consumes a slot and
+prompt space while adding almost nothing.
+
+| k | slots | distinct pages | wasted | effective pages/query |
+|---|---|---|---|---|
+| 6 | 90 | 69 | 23.3% | **4.6** |
+| 10 | 150 | 118 | 21.3% | 7.9 |
+| 15 | 225 | 176 | 21.8% | 11.7 |
+
+So k=6 delivers 4.6 pages of evidence, not 6. Page-level deduplication would
+give ~6 distinct pages from a depth of about 8 — cheaper than k=15 and aimed at
+the actual waste. Not implemented: two chunks from one page can carry different
+content, and the citation UI shows a snippet per chunk, so it is a design
+decision rather than a tweak.
+
+The diagnosis behind all of this is **ranking, not depth**. For the Glorious
+Revolution question the gold page (93–94) sits behind `us-history` 107 and 92 —
+retrieval lands *adjacent* to the right passage and ranks its neighbours above
+it. Chunking, reranking over a wider candidate set, and hybrid keyword+vector
+search all move MRR. Raising k does not.
 
 Two integers were measured individually per §8 Rule 14, because the doubling
 grid put the plateau somewhere in (8, 16] and could not resolve it. The
