@@ -121,7 +121,8 @@ constrain the project rather than merely decorate it:
 
 ## Getting started
 
-> Every command below runs. `streamlit run app.py` starts the UI.
+> Every command below runs. Already set up? Skip to
+> [Running it day to day](#running-it-day-to-day).
 
 **1. Create and activate the virtual environment.** This is the only step that
 differs by platform — pick the one line that matches your shell.
@@ -167,15 +168,86 @@ setx OLLAMA_KEEP_ALIVE -1          # optional: keep the model resident.
                                    # idle and the next question pays to
                                    # reload it. Restart Ollama after setting.
 
-python scripts/download_sources.py # fetch the corpus into data/raw/
-python -m cliopedia.ingest         # build the Chroma index
-
-python -m cliopedia.ask "What caused the Louisiana Purchase?"
-pytest                             # no model or corpus needed
+python -m cliopedia.config         # check the resolved settings
 streamlit run app.py               # the UI
 ```
 
+**You do not need to download the PDFs or build the index.** The Chroma index
+is committed to this repository, so a clone arrives ready to answer questions.
+That is deliberate — the deployed app has no database and only ever reads
+(see [`SPEC.md`](SPEC.md) §4.1).
+
+You only need the corpus if you intend to **rebuild** the index — after changing
+the chunking or the embedding model, say:
+
+```bash
+python scripts/download_sources.py   # ~470 MB into data/raw/ (git-ignored)
+python -m cliopedia.ingest --rebuild # re-embed everything
+```
+
 No API key is needed for local development — Ollama runs on your machine.
+
+---
+
+## Running it day to day
+
+Once setup is done, starting the app is one command. Pick the line for your
+shell, from the repository root:
+
+```powershell
+# Windows, PowerShell — no venv activation needed
+.\venv\Scripts\streamlit.exe run app.py
+```
+
+```bat
+:: Windows, Command Prompt
+venv\Scripts\streamlit.exe run app.py
+```
+
+```bash
+# macOS / Linux
+./venv/bin/streamlit run app.py
+```
+
+Calling the venv's own `streamlit` directly sidesteps activation entirely.
+On Windows that matters: PowerShell blocks `Activate.ps1` under the default
+execution policy, and working around it (`Set-ExecutionPolicy -Scope Process
+-ExecutionPolicy Bypass`) has to be repeated in every new window.
+
+The app opens at `http://localhost:8501`. Press **Ctrl+C** in the terminal to
+stop it. Ollama needs no attention — it runs as a background service.
+
+If you would rather activate the venv (worth it when running several commands),
+see the activation block above, and on Windows make it permanent with
+`Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`.
+
+### Other commands
+
+```bash
+python -m cliopedia.ask "What caused the Louisiana Purchase?"
+python -m cliopedia.ask "..." --snippets   # show the verbatim passages
+python -m cliopedia.retrieve "..."         # retrieval only — no model needed
+python -m cliopedia.evaluate --sweep       # hit rate across several k
+python -m cliopedia.config                 # resolved settings, key redacted
+pytest                                     # no model or corpus needed
+```
+
+`config` is the first thing to run whenever behaviour surprises you — every
+environment variable is read in one place, so a stale `.env` shows up there
+immediately.
+
+### One habit worth having
+
+After anything that queries the index, `git status` will show
+`data/chroma/chroma.sqlite3` as modified. Nothing changed: SQLite rewrites its
+header when the database is opened. Discard it —
+
+```bash
+git checkout -- data/chroma/
+```
+
+Committing that churn adds ~69 MB to history for no change at all. Only commit
+the index after a genuine `python -m cliopedia.ingest --rebuild`.
 
 ---
 
