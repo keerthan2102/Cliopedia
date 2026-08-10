@@ -56,6 +56,10 @@ class Retrieved:
     locator_kind: str
     locator_value: int
     printed_page: int
+    # The chapter or section named in the page's running footer, or "" when the
+    # page has no usable footer. Carries the temporal context the passage text
+    # often lacks — see `ingest._heading`.
+    heading: str = ""
 
     @property
     def cite_page(self) -> int:
@@ -130,6 +134,7 @@ def retrieve(question: str, k: int | None = None, embeddings=None) -> list[Retri
                 locator_kind=meta.get("locator_kind", "page"),
                 locator_value=int(meta.get("locator_value", -1)),
                 printed_page=int(meta.get("printed_page", -1)),
+                heading=meta.get("heading", "") or "",
             )
         )
     return results

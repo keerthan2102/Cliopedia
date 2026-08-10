@@ -56,9 +56,14 @@ served by knowing the textbook is silent than by a plausible invention.
 describe the event you were asked about. Some will be about a different event, \
 period or place that merely uses similar language — a passage about one \
 financial panic can arrive beside a passage about another one a century \
-earlier. Before using a passage, check that its dates, names and events match \
-the question. Answer from the passages that match, and ignore the ones that do \
-not.
+earlier.
+
+Most passages are labelled with the book and chapter they came from. **Use that \
+label.** Passages from different chapters of the same book are usually about \
+different periods, and a chapter title often names its era outright. If the \
+question is about one period and a passage comes from a chapter about another, \
+that passage does not belong in your answer, however closely its wording \
+matches. Where a label is missing, judge by the dates and names in the text.
 
 Never combine details from separate events into a single account. A date, a \
 figure or a cause taken from the wrong episode is a fabrication even though \
@@ -109,7 +114,16 @@ def format_passages(passages: Sequence[Retrieved]) -> str:
     blocks = []
     for number, passage in enumerate(passages, start=1):
         text = " ".join(passage.text.split())
-        blocks.append(f"[{number}] {text}")
+        # The chapter heading, when the page had one, is what lets the model
+        # tell two similar-sounding passages apart. It is shown WITHOUT the page
+        # number on purpose: a page number is a thing the model could cite, and
+        # rule 5 forbids that — the application turns passage indices into pages.
+        # A chapter title carries the same disambiguating force with nothing
+        # citable in it.
+        label = f"[{number}]"
+        if passage.heading:
+            label = f"[{number}] (from {passage.source_title}, chapter {passage.heading})"
+        blocks.append(f"{label} {text}")
     return "\n\n".join(blocks)
 
 
