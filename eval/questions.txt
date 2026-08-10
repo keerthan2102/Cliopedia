@@ -345,3 +345,23 @@ why: Read printed page 534: "in March 1941, the president persuaded Congress to
   title to, exchange, lease, lend or otherwise dispose of, to any such
   government any defense article'." It was "a way to aid those countries already
   fighting but without taking direct military action."
+
+# ── A case where retrieval succeeds and the ANSWER is still wrong ────────────
+
+ask: What happened during the 2008 financial crisis?
+book: us-history
+pages: 896
+why: Read printed page 896: "The prestigious investment firm Lehman Brothers was
+  completely wiped out in September 2008", and "the chairman of the Federal
+  Reserve, Ben Bernanke, authorized a bailout of the Wall Street firm Bear
+  Stearns". The page also covers adjustable-rate loans and foreclosures.
+  ADDED 2026-08-10 because this question produced a grounded-looking but FALSE
+  answer. Retrieval returned this page together with printed 699 (the Great
+  Depression key-terms glossary, including "Black Tuesday October 29, 1929")
+  and printed 679 (the causes of the 1929 crash), and the model merged all
+  three into a single account of 2008 — "a massive stock sell-off in late
+  October", a 40 percent fall, bank runs, the role of automobiles. Every word
+  came from the textbook and every claim carried a citation.
+  Keep this entry even though it is an easy retrieval hit. It is here as a
+  standing reminder that hit rate does not measure grounding: retrieval scores
+  a HIT while the answer is wrong by seventy-nine years.

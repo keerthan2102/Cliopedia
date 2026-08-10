@@ -70,6 +70,30 @@ def test_system_prompt_carries_the_grounding_rules():
     assert "Never invent page numbers" in system
 
 
+def test_system_prompt_forbids_merging_separate_events():
+    """Rule 3, added after a real failure — see the module docstring.
+
+    Asked about the 2008 financial crisis, the model was handed a genuine 2008
+    passage alongside two about the 1929 crash and merged all three. Every word
+    was from the textbook and every claim was cited; the answer was still false.
+    Rule 1 does not cover this, because nothing was invented — true fragments
+    were assembled into an untrue whole.
+    """
+    system = prompts.SYSTEM_PROMPT
+    assert "Never combine details from separate events" in system
+    assert "dates, names and events match the question" in system
+
+
+def test_the_rule_numbering_stays_consistent_with_its_cross_reference():
+    """Rule 7 points at 'rule 2' by number, so inserting a rule can break it."""
+    system = prompts.SYSTEM_PROMPT
+    # The refusal sentence must still be introduced by rule 2, since rule 7
+    # refers to it that way.
+    rule_two = system.split("2. ")[1].split("3. ")[0]
+    assert prompts.REFUSAL in rule_two
+    assert "Do NOT use the sentence from rule 2" in system
+
+
 def test_empty_retrieval_refuses_without_calling_the_model():
     """No passages is answerable without a network round trip."""
 
