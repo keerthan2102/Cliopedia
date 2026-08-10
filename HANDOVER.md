@@ -4,7 +4,7 @@ Relay baton for the next session. **Read this, act on it, then delete it** —
 that is the convention (README §Project documents; commit `1f06fc7` removed an
 earlier one after pickup, and this file replaces one deleted the same way).
 
-Written 2026-08-10. `main` is at **`dd8a889`**. Working tree clean.
+Written 2026-08-10. `main` is at **`4098df7`**. Working tree clean.
 
 Read `CLAUDE.md` first — it is the working agreement and overrides anything
 here. This file carries only what `CLAUDE.md` cannot know yet.
@@ -14,7 +14,8 @@ here. This file carries only what `CLAUDE.md` cannot know yet.
 ## 1. What this session accomplished
 
 The corpus expansion, end to end: one book → three, with the measurement to
-show what it cost. Eight commits, all merged to `main` via PRs #3–#10.
+show what it cost, plus a grounding fix the expansion exposed. Nine commits,
+all merged to `main` via PRs #3–#12.
 
 | commit | what |
 |---|---|
@@ -25,6 +26,7 @@ show what it cost. Eight commits, all merged to `main` via PRs #3–#10.
 | `4372209` | docs: settle RETRIEVAL_K at 6, record where the real waste is |
 | `4d9fba6` | test: cover World History in the question set |
 | `ecb87ee` | docs: add a day-to-day run section to the README |
+| `ebd5d48` | fix: forbid the model merging passages about different events |
 
 Two bugs found by *preparing* the expansion rather than by running it:
 
@@ -46,11 +48,11 @@ footer: detection 472/987, same answer 16. Both World History volumes resolve to
 
 ### Works, verified this session
 
-- **128 tests pass**, under both `pytest` and `python -m pytest`.
+- **130 tests pass**, under both `pytest` and `python -m pytest`.
 - **Index committed and live**: 9275 chunks, 84 MB, `chroma.sqlite3` 69 MB
   (clears GitHub's 100 MB per-file limit). Folio offsets 16 / 10 / 10.
 - **All three licences read off the PDFs themselves**: CC BY-NC-SA 4.0.
-- **`eval/questions.txt` is 30 questions**: 15 us-history, 8 world-history-1,
+- **`eval/questions.txt` is 31 questions**: 16 us-history, 8 world-history-1,
   7 world-history-2.
 - **`requirements.txt` resolves and imports cleanly** in a fresh venv
   (`transformers 5.14.1 / tokenizers 0.22.2`). Do not "fix" it.
@@ -79,16 +81,37 @@ retrievable.** So the problem is interference and *ranking*, not reachability.
 
 ### Broken / open
 
-- **A real hallucination is on record and unfixed.** Asked "Tell me about the
-  Roman conquest of Britain", the app produced a cited answer containing:
-  *"unlike in Gaul, the Romans did not have a permanent presence in Britain
-  until the late first century CE."* World History Vol 1 p.297 dates it to
-  **43 CE**; the phrase "late first century" appears nowhere, and the page's
-  "Unlike the case in Gaul" attaches to centuriation and roads being direct
-  control, not to the permanent presence. Everything else in that answer checked
-  out against pp.297 and 423. **The author reports this was produced on
-  `llama3.1:8b`, not the smaller model — so it is not a small-model artifact and
-  points at `cliopedia/prompts.py`.** Reproduce before changing anything.
+- **Two grounding failures are on record. A mitigation shipped in `ebd5d48`
+  (PR #12) and has NOT been verified against a real model.** Both were produced
+  on `llama3.1:8b`, the locked model, so neither is a small-model artifact.
+
+  **The bad one — merged events.** Asked "What happened during the 2008
+  financial crisis?", the app produced a cited answer describing "a massive
+  stock sell-off in late October", a 40 percent fall, bank runs and the role of
+  automobiles. That is Black Tuesday **1929**. Retrieval returned U.S. History
+  p.896 (genuinely 2008 — Lehman, Bear Stearns, Bernanke) alongside pp.679 and
+  699 (causes of the 1929 crash; the Great Depression key-terms glossary), and
+  the model merged all three into one account of 2008. Every word came from the
+  textbook, every claim was cited, and the answer was wrong by 79 years. Rule 1
+  does not cover this — nothing was invented, true fragments were assembled into
+  an untrue whole.
+
+  **The subtler one — relocated claim.** Asked about the Roman conquest of
+  Britain, the answer said *"the Romans did not have a permanent presence in
+  Britain until the late first century CE."* World History Vol 1 p.297 dates it
+  to **43 CE**, never uses that phrase, and its own "Unlike the case in Gaul"
+  attaches to centuriation and roads, not to the permanent presence. The rest of
+  that answer checked out against pp.297 and 423.
+
+  **What shipped:** `prompts.py` rule 3 — passages are selected by similarity of
+  wording rather than subject; check dates and names against the question; never
+  combine details from separate events. Rules renumbered 4–7, with a test
+  pinning the `rule 2` cross-reference.
+
+  **Why it is probably not enough**, measured rather than guessed: the chunk the
+  model quoted for the late-October claim (p.699) **contains no year at all**, so
+  there is nothing in it for rule 3's date check to catch. See the open decision
+  on `format_passages()` in §4.
 - **P1 (Streamlit UI) still has no completed human pass.** The author is using
   it, but the exit criterion — a stranger can use it unaided and verify any
   claim — has not been formally signed off.
@@ -105,20 +128,37 @@ retrievable.** So the problem is interference and *ranking*, not reachability.
 
 ## 3. Exact next steps
 
-### Step 1 — reproduce the grounding failure (highest value)
+### Step 1 — verify the grounding fix (highest value, needs Ollama)
+
+`prompts.py` rule 3 shipped in `ebd5d48` and has **never been run against a
+model**. That environment had no Ollama. Do this first:
 
 ```bash
+python -m cliopedia.ask "What happened during the 2008 financial crisis?" --snippets
 python -m cliopedia.ask "Tell me about the Roman conquest of Britain?" --snippets
 ```
 
-Check whether the "late first century CE" claim recurs. If it does, the fix
-belongs in `cliopedia/prompts.py` — the grounding instruction is not holding the
-model to the passage. Read the current prompt before editing; §4.4 of
-`CLAUDE.md` is the governing rule (never let the model fall back on memory).
+Failure signatures to look for: "late October" or "40 percent" or bank runs in
+the 2008 answer; "late first century" in the Roman one. Either means rule 3 did
+not hold.
 
-This is the most valuable open thread: it is a live instance of the exact
-failure the project exists to prevent, on the locked model, with the evidence
-already gathered.
+If the 2008 answer is still wrong, the likely cause is already diagnosed and
+is **not** the prompt wording. At k=6 the model receives:
+
+```
+[1] p.896  years in chunk: ['2008','2009']
+[2] p.699  years in chunk: []        <- the chunk it quoted
+[3] p.679  years in chunk: ['1929']
+[5] p.896  years in chunk: ['2008']
+```
+
+Rule 3 tells the model to check dates; passage [2] has none. It also never sees
+page numbers or titles — `format_passages()` emits `[n] text` only — so it
+cannot tell [1] and [2] sit 200 pages apart in a chronological textbook. That is
+the open decision in §4; do not act on it without the author.
+
+This remains the most valuable thread in the project: a live instance of the
+exact failure it exists to prevent, on the locked model, fully diagnosed.
 
 ### Step 2 — attack ranking, not k
 
@@ -165,6 +205,7 @@ the page verbatim, so this is a read, not a rerun.
 | Commit the index | First time it has been, despite four documents describing it as committed. `SPEC.md` §4.1 requires it — Streamlit Cloud has no database. 69 MB clears GitHub's limit. |
 | Did **not** touch `requirements.txt` | An apparent `tokenizers`/`transformers` conflict was self-inflicted by `--ignore-installed` in system Python. Verified clean in a fresh venv first. |
 | Left Rule 10's confidence claim alone | It says the offset of 16 was established "with a clear majority of pages agreeing"; it was 6 of 987 — a majority of *detections*. The factual correction is in the `_folio_offset` docstring. Amending a **learned rule** is the author's call. **Still open.** |
+| Did **not** add page numbers to `format_passages()` | **Open decision, needs the author.** It would likely fix the merged-events failure by letting the model see that two passages sit 200 pages apart. But the omission is deliberate: withholding page numbers is what stops the model writing "p. 699" into answers instead of `[2]`, which rule 5 forbids and `citations.py` depends on. Three options were put to the author — (1) add book + page and strengthen rule 5, (2) add only the section heading (`25.2 • The Great Depression`), which gives temporal context without a citable number but needs an `ingest.py` change and a full re-embed, (3) accept rule 3 as partial mitigation. Option 2 was recommended. **Test rule 3 alone first — if it holds, none of this is needed.** |
 
 ---
 
