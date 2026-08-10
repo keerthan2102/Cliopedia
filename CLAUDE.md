@@ -25,31 +25,50 @@ tradeoff: clarity over cleverness, explainability over brevity.
 
 **Status: P0 proven end to end** — a real question returns a grounded answer
 citing printed page numbers, running locally against Ollama `llama3.1:8b`
-over 3775 chunks of the OpenStax corpus. **P1 (Streamlit UI) is built but
-not yet exercised by a human.** P2 is next.
+over **9275 chunks** across all three OpenStax books. **P1 (Streamlit UI) is
+built but not yet exercised by a human.** P2 is next.
 
-### Retrieval baseline — measured 2026-08-05
+### Retrieval baseline — three books, measured 2026-08-10
 
-The first real numbers, against the 15 hand-verified questions in
-`eval/questions.txt`, over 3775 chunks of the single-book corpus:
+The same 15 hand-verified questions in `eval/questions.txt`, before and after
+the corpus grew from one book (3775 chunks) to three (9275 chunks). Every
+question is still a U.S. History question; the two World History volumes are
+pure distractors here, which is exactly what makes this an interference test.
 
-| k | hit rate | MRR |
-|---|---|---|
-| 1 | 53.3% | 0.533 |
-| 2 | 66.7% | 0.600 |
-| 4 | 86.7% | 0.656 |
-| 5 | 93.3% | 0.669 |
-| **6** | **100.0%** | **0.680** |
-| 7, 8, 16 | 100.0% | 0.680 |
+| k | hit rate (1 book) | hit rate (3 books) | MRR (1 book) | MRR (3 books) |
+|---|---|---|---|---|
+| 1 | 53.3% | 46.7% | 0.533 | 0.467 |
+| 2 | 66.7% | 53.3% | 0.600 | 0.500 |
+| 4 | 86.7% | **60.0%** | 0.656 | 0.517 |
+| 6 | **100.0%** | 86.7% | 0.680 | 0.568 |
+| 8, 9 | 100.0% | 86.7% | 0.680 | 0.568 |
+| 10–14 | — | 93.3% | — | 0.574 |
+| **15** | — | **100.0%** | — | 0.579 |
+| 16 | 100.0% | 100.0% | 0.680 | 0.579 |
 
-`RETRIEVAL_K` is **6**, the smallest k that retrieves every known-correct
-page. Eight of fifteen questions put the right page at rank 1.
+**The expansion cost real accuracy, and that is the finding.** At the
+configured k=6, hit rate fell 100% → 86.7%. The worst damage is at k=4:
+86.7% → 60.0%. MRR fell at every single k, which is the more diagnostic
+number — the correct pages did not merely get crowded out, they got
+**out-ranked** by world-history passages that do not answer the question.
 
-**This is a floor, not a triumph.** Fifteen questions means one item is worth
-6.7 points, so 100% here says "no known question fails", not "retrieval is
-solved". Its value is as a regression check and as the **before** number for
-the corpus expansion — expanding to three books should push it down, and that
-movement is the measurement worth having.
+**`RETRIEVAL_K` is still 6 and now under-performs.** The old policy — smallest
+k that retrieves every known-correct page — would now select **15**. That is
+2.5× the passages per query, and MRR is essentially flat from k=8 to k=16
+(0.568 → 0.579), so those extra passages buy recall without buying ranking.
+Whether to pay that, settle for 93.3% at k=10, or leave k alone and attack
+ranking directly (chunking, reranking, hybrid search) is **an open decision,
+not yet made.** Do not change `RETRIEVAL_K` without deciding it deliberately.
+
+Two integers were measured individually per §8 Rule 14, because the doubling
+grid put the plateau somewhere in (8, 16] and could not resolve it. The
+rule's MRR cross-check predicted the newly-found pages would sit near rank 12;
+they came in at 10 and 15.
+
+**Still a floor, not a triumph.** Fifteen questions means one item is worth
+6.7 points, and all fifteen ask about one of the three books. A question set
+covering World History would measure something this one cannot: whether the
+new books are retrievable at all, as opposed to merely getting in the way.
 
 Re-run `python -m cliopedia.evaluate --sweep` after any change to the corpus,
 the chunking, or the embedding model, and update this table.
@@ -625,3 +644,31 @@ Format:
   while `questions.txt` is in printed units and every question for it MISSes —
   loud, and therefore the safe direction, but check the ingest output for it.
 - **Date**: 2026-08-07
+
+### Rule 16: reading the index modifies it, and the index is a committed file
+
+- **Trigger**: running `python -m cliopedia.evaluate --sweep` — a pure read —
+  left `data/chroma/chroma.sqlite3` showing as modified in `git status`. Opening
+  a SQLite database mutates its header (the change counter, and page bookkeeping
+  on checkpoint) even when nothing is written. Same size, same rows: verified by
+  hashing all 9275 embedding rows and all 64,925 metadata rows on both sides —
+  **identical content, different bytes**.
+- **Why it matters here specifically**: nearly every project can ignore this,
+  because nearly every project keeps its database out of Git. This one commits
+  the index on purpose (`SPEC.md` §4.1 — Streamlit Community Cloud gives us no
+  database). So an incidental 69 MB binary diff appears after *any* query, and
+  `git commit -a` would silently add 69 MB to history for a change that means
+  nothing. Do that a few times and the clone is hundreds of MB of noise. Git
+  stores every version forever and cannot delta-compress this file usefully.
+- **Correct behavior**: after querying or evaluating, `git checkout --
+  data/chroma/` to discard the churn. Only commit the index when it was
+  genuinely **rebuilt** — i.e. right after `python -m cliopedia.ingest
+  --rebuild`, and for a real reason (corpus, chunking, or embedding model
+  changed). Treat a `data/chroma/` diff that follows a read as noise to drop,
+  never as a change to record. If it is ever unclear which happened, compare
+  logical content rather than bytes: row counts and a hash over the rows.
+- **The general point**: "is this file modified?" and "is this file's meaning
+  different?" are not the same question, and for binary build artifacts under
+  version control they routinely disagree. Ask which one you actually care
+  about before committing.
+- **Date**: 2026-08-10
