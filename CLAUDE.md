@@ -92,10 +92,47 @@ grid put the plateau somewhere in (8, 16] and could not resolve it. The
 rule's MRR cross-check predicted the newly-found pages would sit near rank 12;
 they came in at 10 and 15.
 
-**Still a floor, not a triumph.** Fifteen questions means one item is worth
-6.7 points, and all fifteen ask about one of the three books. A question set
-covering World History would measure something this one cannot: whether the
-new books are retrievable at all, as opposed to merely getting in the way.
+### Per-book coverage — 30 questions, measured 2026-08-10
+
+Fifteen World History questions were added, so the set now covers every book.
+At the configured k=6:
+
+| book | questions | hit rate | MRR |
+|---|---|---|---|
+| us-history | 15 | 86.7% | 0.568 |
+| world-history-1 | 8 | 100.0% | 0.875 |
+| world-history-2 | 7 | 100.0% | 0.738 |
+| all | 30 | 93.3% | 0.689 |
+
+**The new books are retrievable.** That is what these questions were for, and
+it is a real answer: the expansion did not bury two volumes that can never be
+reached. Not one World History question missed.
+
+**Do not read the per-book gap as a quality comparison.** The two groups were
+written by different people using different methods, which confounds it:
+
+- The World History questions lean on distinctive proper nouns — *Çatalhöyük*,
+  *cartaz*, *Songhai*, *Siemens-Martin*, *Lend-Lease* — which embed nearly
+  uniquely and are therefore easy to retrieve.
+- The U.S. History questions are deliberately in a student's voice, several
+  paraphrased away from the textbook's own wording ("Tell me about the Glorious
+  Revolution"). That is the harder case, and the more realistic one.
+- Pages were also chosen for having clearly distinctive content, which biases
+  toward retrievable pages.
+
+So 0.875 versus 0.568 measures **question style at least as much as retrieval
+quality**. Compare within a book over time, not across books.
+
+**The "all" row is the least trustworthy number here.** Hit rate rose from
+86.7% to 93.3% purely because easier questions were added — the retriever did
+not change. Adding items to a benchmark moves its aggregate for reasons that
+have nothing to do with the system, so track the per-book rows.
+
+**Still a floor, not a triumph.** Thirty questions means one item is worth 3.3
+points. The World History entries were written from `pypdf`-extracted text
+rather than the rendered page, and have not been spot-checked against the PDF
+by a human — worth doing, since Rule 13's lesson is that an unverified answer
+key is worth nothing.
 
 Re-run `python -m cliopedia.evaluate --sweep` after any change to the corpus,
 the chunking, or the embedding model, and update this table.
