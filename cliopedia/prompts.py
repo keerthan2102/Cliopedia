@@ -8,6 +8,19 @@ than a string buried three functions deep in `generate.py`.
 The grounding guarantee is enforced here and nowhere else. Retrieval decides
 *which* passages the model sees; this decides what it is allowed to do with
 them.
+
+Rule 3 exists because of a specific observed failure, and is worth
+understanding before anyone trims it. Asked "What happened during the 2008
+financial crisis?", the app retrieved U.S. History p.896 — genuinely about
+Lehman Brothers and Bear Stearns in 2008 — alongside pp.679 and 699, which are
+the causes of the 1929 crash and the Great Depression key-terms glossary. The
+model merged all three into one account of 2008, complete with "a massive stock
+sell-off in late October" and a 40 percent fall, which is Black Tuesday 1929.
+Every word came from the textbook. Every claim carried a citation. The answer
+was still false, and the citations made it *more* believable.
+
+That is the failure mode this file has to prevent: not invention from memory,
+which rule 1 covers, but assembly of true fragments into an untrue whole.
 """
 
 from __future__ import annotations
@@ -39,19 +52,32 @@ and nothing else:
 This is a correct and useful answer, not a failure. A student is far better \
 served by knowing the textbook is silent than by a plausible invention.
 
-3. Cite every factual claim with the number of the passage it came from, in \
+3. The passages are selected by similarity of wording, NOT by whether they \
+describe the event you were asked about. Some will be about a different event, \
+period or place that merely uses similar language — a passage about one \
+financial panic can arrive beside a passage about another one a century \
+earlier. Before using a passage, check that its dates, names and events match \
+the question. Answer from the passages that match, and ignore the ones that do \
+not.
+
+Never combine details from separate events into a single account. A date, a \
+figure or a cause taken from the wrong episode is a fabrication even though \
+every word of it came from the textbook — and the citation makes that error \
+more convincing, not less.
+
+4. Cite every factual claim with the number of the passage it came from, in \
 square brackets, immediately after the claim. Example:
 The purchase doubled the size of the United States [2].
 A sentence drawn from two passages carries both: ... [1][3].
 
-4. Never cite a passage number you were not given. Never invent page numbers — \
+5. Never cite a passage number you were not given. Never invent page numbers — \
 cite passage numbers only, and the application will turn those into pages.
 
-5. Answer in prose, a few sentences, in a neutral explanatory register. Do not \
+6. Answer in prose, a few sentences, in a neutral explanatory register. Do not \
 add a preamble, do not restate the question, and do not mention "the passages" \
 or "the context" — write as though explaining the history itself.
 
-6. If the passages partly answer the question, answer the part they cover and \
+7. If the passages partly answer the question, answer the part they cover and \
 say plainly what they do not address, in your own words. Do not fill the gap. \
 Do NOT use the sentence from rule 2 in this case — that sentence is reserved \
 for when the passages answer nothing at all, and the application treats it as a \
