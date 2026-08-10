@@ -14,7 +14,7 @@ worth holding in place.
 
 from __future__ import annotations
 
-from cliopedia.ingest import _folio, _folio_offset
+from cliopedia.ingest import _folio, _folio_offset, _heading
 
 # Verbatim last lines from the three books in the corpus.
 US_FOOTERS = [
@@ -132,3 +132,66 @@ def test_a_split_vote_is_refused_rather_than_broken_arbitrarily():
 def test_a_book_with_no_folios_at_all_declines():
     texts = [page("Body text.", "More body text.") for _ in range(50)]
     assert _folio_offset(texts) is None
+
+
+# ── Chapter headings ────────────────────────────────────────────────────────
+# Every string below was copied out of a real OpenStax page during the
+# investigation of the 2008-vs-1929 grounding failure. The heading is what lets
+# the model tell two similar-sounding passages apart, so the parsing is pinned
+# against the layouts that actually occur rather than invented ones.
+
+
+def test_heading_with_the_folio_printed_last():
+    """'25 • Key Terms  699' — the leading 25 is the CHAPTER, not the folio."""
+    assert _heading(page("Body.", "25 • Key Terms     699")) == "25 Key Terms"
+
+
+def test_heading_with_the_folio_printed_first():
+    text = page("Body.", "896     32 • The Challenges of the Twenty-First Century")
+    assert _heading(text) == "32 The Challenges of the Twenty-First Century"
+
+
+def test_heading_behind_the_openstax_boilerplate():
+    """The boilerplate is the last line on many pages, pushing the footer up."""
+    text = page(
+        "Body.",
+        "680     25 • Brother, Can You Spare a Dime? The Great Depression, 1929-1932",
+        "Access for free at openstax.org",
+    )
+    assert _heading(text) == (
+        "25 Brother, Can You Spare a Dime? The Great Depression, 1929-1932"
+    )
+
+
+def test_a_section_level_heading_keeps_its_decimal():
+    assert _heading(page("Body.", "25.1 • The Stock Market Crash of 1929     679")) == (
+        "25.1 The Stock Market Crash of 1929"
+    )
+
+
+def test_a_page_with_no_footer_declines():
+    """About one page in ten. Better unlabelled than wrongly labelled."""
+    assert _heading(page("Body text.", "More body text.")) is None
+    assert _heading("") is None
+
+
+def test_a_bullet_in_mid_body_prose_is_not_mistaken_for_a_footer():
+    """Only the first, last and second-to-last lines are considered.
+
+    A bullet in the middle of a page is body text. Note the page has to be long
+    enough for "middle" to exist — on a three-line page the bulleted line *is*
+    the second-to-last, which is exactly where a real footer sits.
+    """
+    text = page(
+        "Intro.",
+        "12 • this is a bulleted body line",
+        "More prose.",
+        "Yet more prose.",
+        "Closing prose.",
+    )
+    assert _heading(text) is None
+
+
+def test_the_heading_is_length_capped():
+    long_title = "x" * 200
+    assert len(_heading(page("Body.", f"7 • {long_title}"))) <= 80

@@ -213,6 +213,50 @@ def _folio_offset(page_texts: list[str]) -> int | None:
     return offset
 
 
+# OpenStax prints a running footer naming the chapter or section, e.g.
+#   "25 • Brother, Can You Spare a Dime? The Great Depression, 1929-1932"
+#   "7.5 • The Regions of Rome"
+# The boilerplate line below sits *after* that footer on many pages, which is
+# why the heading is often the second-to-last line rather than the last.
+_BOILERPLATE = re.compile(r"Access for free at openstax\.org\.?", re.IGNORECASE)
+_HEADING = re.compile(r"(\d+(?:\.\d+)?)\s*•\s*(.+)")
+
+
+def _heading(page_text: str) -> str | None:
+    """The chapter or section named in this page's running footer.
+
+    Exists to give the model temporal context it otherwise cannot recover.
+    Asked about the 2008 financial crisis, retrieval returns pages from both
+    chapter 32 ("The Challenges of the Twenty-First Century") and chapter 25
+    ("Brother, Can You Spare a Dime? The Great Depression, 1929-1932"), and the
+    passage text alone often carries no date at all — the chunk describing "a
+    massive stock sell-off in late October" never says 1929. Two chunks that
+    look alike become obviously different once their chapters are visible.
+    See `prompts.py` for the failure this was built to stop.
+
+    Deliberately returns None rather than guessing. About one page in ten has no
+    usable footer — chapter openers, full-page figures, front matter — and a
+    passage with no heading is better than one labelled with the wrong chapter.
+    """
+    lines = [line.strip() for line in page_text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    # Last line, then second-to-last (boilerplate often occupies the last),
+    # then first — the footer sits at the head on some layouts.
+    for raw in lines[-1:] + lines[-2:-1] + lines[:1]:
+        clean = _BOILERPLATE.sub("", raw).strip()
+        clean = re.sub(r"\s+\d{1,4}$", "", clean)  # folio printed after the title
+        # Match before stripping any leading number. When the folio is printed
+        # last, the leading digits ARE the chapter number ("25 • Key Terms 699")
+        # and stripping them first loses exactly what we came for.
+        for candidate in (clean, re.sub(r"^\d{1,4}\s+", "", clean)):
+            match = _HEADING.search(candidate)
+            if match:
+                title = " ".join(match.group(2).split())
+                return f"{match.group(1)} {title}"[:80]
+    return None
+
+
 def load_pages(pdf: Path) -> tuple[list, int | None]:
     """Read a PDF into one Document per page, using pypdf directly.
 
@@ -231,7 +275,10 @@ def load_pages(pdf: Path) -> tuple[list, int | None]:
     offset = _folio_offset(texts)
 
     pages = [
-        Document(page_content=text, metadata={"page_index": index})
+        Document(
+            page_content=text,
+            metadata={"page_index": index, "heading": _heading(text) or ""},
+        )
         for index, text in enumerate(texts, start=1)
         if text.strip()  # image-only pages carry no retrievable text
     ]
@@ -281,6 +328,8 @@ def load_and_split(pdf_paths: Iterable[Path]) -> list:
                 "locator_value": pdf_page,
                 "printed_page": printed if printed and printed > 0 else -1,
                 "source_file": pdf.name,
+                # Empty string rather than None: Chroma stores scalars only.
+                "heading": chunk.metadata.get("heading", ""),
             }
             chunks.append(chunk)
 

@@ -17,7 +17,9 @@ from cliopedia import generate, prompts
 from cliopedia.retrieve import Retrieved
 
 
-def passage(text: str, printed: int = 12, pdf: int = 20) -> Retrieved:
+def passage(
+    text: str, printed: int = 12, pdf: int = 20, heading: str = ""
+) -> Retrieved:
     return Retrieved(
         text=text,
         similarity=0.9,
@@ -26,6 +28,7 @@ def passage(text: str, printed: int = 12, pdf: int = 20) -> Retrieved:
         locator_kind="page",
         locator_value=pdf,
         printed_page=printed,
+        heading=heading,
     )
 
 
@@ -46,6 +49,39 @@ def test_passage_text_is_whitespace_collapsed():
     """PDF text carries printed-column line breaks, not sentence structure."""
     wrapped = passage("The Louisiana\nPurchase   of\n1803 doubled")
     assert prompts.format_passages([wrapped]) == "[1] The Louisiana Purchase of 1803 doubled"
+
+
+def test_a_chapter_heading_is_shown_with_its_passage():
+    """The signal that lets the model tell 1929 from 2008."""
+    labelled = passage("a massive stock sell-off in late October", heading="25 Key Terms")
+    text = prompts.format_passages([labelled])
+    assert "chapter 25 Key Terms" in text
+    assert "OpenStax U.S. History" in text
+
+
+def test_the_heading_label_carries_no_page_number():
+    """Rule 5 forbids citing pages; do not hand the model one to cite."""
+    labelled = passage("text", printed=699, pdf=715, heading="25 Key Terms")
+    text = prompts.format_passages([labelled])
+    assert "699" not in text
+    assert "715" not in text
+
+
+def test_a_passage_without_a_heading_is_still_numbered_plainly():
+    """About one page in ten has no usable footer. It must not break."""
+    assert prompts.format_passages([passage("text")]).startswith("[1] text")
+
+
+def test_two_chapters_are_distinguishable_in_the_prompt():
+    """The exact 2008-vs-1929 confusion, in the form the model now sees."""
+    text = prompts.format_passages([
+        passage("adjustable-rate loans, millions defaulted",
+                heading="32 The Challenges of the Twenty-First Century"),
+        passage("a massive stock sell-off in late October",
+                heading="25 Brother, Can You Spare a Dime? The Great Depression, 1929-1932"),
+    ])
+    assert "chapter 32 The Challenges of the Twenty-First Century" in text
+    assert "The Great Depression, 1929-1932" in text
 
 
 def test_messages_are_system_then_user():
@@ -81,7 +117,11 @@ def test_system_prompt_forbids_merging_separate_events():
     """
     system = prompts.SYSTEM_PROMPT
     assert "Never combine details from separate events" in system
-    assert "dates, names and events match the question" in system
+    # The chapter label is the signal that makes rule 3 actionable: the quoted
+    # chunk in the 2008 failure contained no date, so "check the dates" alone
+    # gave the model nothing to check.
+    assert "different chapters" in system
+    assert "judge by the dates and names in the text" in system
 
 
 def test_the_rule_numbering_stays_consistent_with_its_cross_reference():
