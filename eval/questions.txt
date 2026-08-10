@@ -209,3 +209,139 @@ pages: 754
 why: Read printed page 754: "During the 1930s, Americans had caught
   glimpses of Japanese armies in action and grew increasingly sympathetic
   towards war-torn China."
+
+# ── World History ───────────────────────────────────────────────────────────
+#
+# Added 2026-08-10, after the corpus grew to three books. The fifteen entries
+# above are all U.S. History, so they measure INTERFERENCE — whether the new
+# volumes push the right U.S. History page out of the top k. They cannot
+# measure whether the new books are retrievable at all. These do.
+#
+# Offset for both volumes is 10, so PDF page 121 is printed page 111.
+
+ask: Why did people at Çatalhöyük enter their houses through the roof?
+book: world-history-1
+pages: 61
+why: Read printed page 61: "Houses at Çatalhöyük were made with mud brick and
+  were clustered together without roads or passages between them. This design
+  required that residents enter their homes from the roof, but it provided them
+  with protection from the outside world."
+
+ask: How many workers did it take to build the Great Pyramid at Giza?
+book: world-history-1
+pages: 96
+why: Read printed page 96: Herodotus "recorded that the pyramid of Khufu took
+  100,000 workers twenty years to construct", but "Modern archaeologists suspect
+  that a much smaller but still substantial workforce of around twenty thousand
+  was likely employed." Chosen partly because the page gives two competing
+  figures — a good test of whether the retrieved passage supports the answer.
+
+ask: What difficulties did Egyptian traders face at the end of the New Kingdom?
+book: world-history-1
+pages: 141
+why: Read printed page 141: an envoy sent to Phoenicia to buy cedar "was robbed
+  by his own crew, then he was refused the cedar he was promised in Phoenicia,
+  and finally he was attacked by roving migrants." The page ties these to the
+  Late Bronze Age Collapse.
+
+ask: How did the state of Qin become powerful enough to dominate its neighbours?
+book: world-history-1
+pages: 178
+why: Read printed page 178: Qin "capitalized on these economic and social
+  changes by adopting Legalist reforms", the arrival of Lord Shang around
+  390 BCE was "the turning point", and its frontier position "kept them in a
+  state of constant alert and readiness for war, creating a more militaristic
+  culture and an experienced army".
+
+ask: Why was Julius Caesar assassinated?
+book: world-history-1
+pages: 262
+why: Read printed page 262: in 44 BCE Caesar's "dictatorship was made
+  permanent, or for life", and "These appointments and other efforts to
+  accumulate power unnerved many Romans... former optimates viewed him as a
+  tyrant, and in 44 BCE two of them, Brutus and Cassius, led a conspiracy that
+  resulted in his assassination."
+
+ask: Who was King Ezana and why does he matter in the history of Aksum?
+book: world-history-1
+pages: 432
+why: Read printed page 432: "King Ezana came to power in the mid-fourth century,
+  and what we know about the Christianization of Aksum comes largely from his
+  reign." He also "conducted successful military engagements against the Beja
+  and Nubian people, subduing the Kingdom of Kush".
+
+ask: What did the Rashidun caliphs contribute to Islamic religious law?
+book: world-history-1
+pages: 470
+why: Read printed page 470: "The first four caliphs committed to writing a
+  canonized Quran and helped interpret and articulate the religious law", and
+  they played "a crucial role in transmitting the hadith, the sayings and
+  actions of Muhammad and his closest confidants".
+
+ask: How did the Hundred Years War contribute to the decline of feudalism?
+book: world-history-1
+pages: 690
+why: Read printed page 690: the war "changed the nature of warfare and minimized
+  the nobles' traditional military role", because "large professional standing
+  armies paid for by monarchs could defeat mounted knights with the use of the
+  longbow", and "the combination of depopulation, shifting military practices,
+  and centralization of monarchical power led to the demise of feudalism."
+
+ask: What was the cartaz and why did Indian Ocean traders resent it?
+book: world-history-2
+pages: 48
+why: Read printed page 48: from 1502 the Portuguese demanded "that ships trading
+  in the Indian Ocean carry a cartaz, a document bearing the Christian cross".
+  Ships without one "had their cargoes seized and were sunk", and "Muslim,
+  Jewish, and Hindu captains objected to having to bear a document with the
+  Christian cross".
+
+ask: Who founded the Songhai Empire and how far did it stretch?
+book: world-history-2
+pages: 85
+why: Read printed page 85: "Founded by Sunni Ali in the late fifteenth century,
+  Songhai reached its imperial height under the founder of the Askia dynasty,
+  Muhammad Ture." It stretched "from Senegal-Gambia on the Atlantic coast in the
+  west all the way to Kano in the Hausaland region of present-day Nigeria".
+
+ask: How did gunpowder reach the Islamic empires?
+book: world-history-2
+pages: 122
+why: Read printed page 122: "Originally developed in China, gunpowder was
+  transmitted to the Islamic world in the thirteenth and fourteenth centuries,
+  possibly first introduced by the Mongols." The Ottomans "famously used
+  artillery in the siege of Constantinople in 1453".
+
+ask: Why did Europeans begin searching for new sea routes to Asia?
+book: world-history-2
+pages: 166
+why: Read printed page 166: with "the collapse of Constantinople and the fall of
+  the Byzantine Empire to the Ottomans in 1453", Muslims "controlled their
+  tenuous overland connections to South and East Asia", so Europeans "had to go
+  through Muslim intermediaries to purchase valuable spices such as cinnamon,
+  pepper, cloves, and nutmeg".
+
+ask: How did steel production change during the Second Industrial Revolution?
+book: world-history-2
+pages: 330
+why: Read printed page 330: the Siemens-Martin process, "first developed in
+  Germany in the 1860s, was slower than the Bessemer process, but it produced
+  higher-quality steel that was less brittle", and "had become the most common
+  way of manufacturing steel" by the twentieth century.
+
+ask: What was utopian socialism?
+book: world-history-2
+pages: 415
+why: Read printed page 415: "In the early nineteenth century, utopian socialism,
+  which focused on perfecting society, dominated. French visionaries like Henri
+  de Saint-Simon and Charles Fourier wrote of ideal societies based on sharing
+  and cooperation."
+
+ask: What was the Lend-Lease Act?
+book: world-history-2
+pages: 534
+why: Read printed page 534: "in March 1941, the president persuaded Congress to
+  approve the Lend-Lease Act, which allowed the government to 'sell, transfer
+  title to, exchange, lease, lend or otherwise dispose of, to any such
+  government any defense article'." It was "a way to aid those countries already
+  fighting but without taking direct military action."
