@@ -117,7 +117,11 @@ def retrieve(question: str, k: int | None = None, embeddings=None) -> list[Retri
 
     k = k or settings.retrieval_k
     store = open_index(embeddings)
-    hits = store.similarity_search_with_score(question, k=k)
+    # With reranking on, search wider than we intend to return: the cross-encoder
+    # can only promote a passage the embedding search actually found. Depth is
+    # where the recall comes from; the reranker supplies the ordering.
+    depth = max(k, settings.rerank_depth) if settings.rerank else k
+    hits = store.similarity_search_with_score(question, k=depth)
 
     results = []
     for document, distance in hits:
@@ -137,7 +141,52 @@ def retrieve(question: str, k: int | None = None, embeddings=None) -> list[Retri
                 heading=meta.get("heading", "") or "",
             )
         )
-    return results
+    if settings.rerank:
+        results = rerank(question, results)
+    return results[:k]
+
+
+_reranker = None
+
+
+def _load_reranker():
+    """The cross-encoder, loaded once per process and kept.
+
+    Deferred rather than imported at module scope so that nothing pays for it
+    while `RERANK` is off — which is the default, and is what keeps the deployed
+    footprint unchanged until `SPEC.md` §2.2's memory question is settled.
+    """
+    global _reranker
+    if _reranker is None:
+        from sentence_transformers import CrossEncoder
+
+        _reranker = CrossEncoder(settings.rerank_model)
+    return _reranker
+
+
+def rerank(question: str, passages: list[Retrieved]) -> list[Retrieved]:
+    """Reorder passages by scoring each one against the question directly.
+
+    The embedding search that produced `passages` never saw the question and the
+    passage together — it compared two vectors built independently. That is what
+    makes searching 9275 chunks fast, and also what makes its ordering weak:
+    measured MRR was 0.699, so the right page was often retrieved but not put
+    first. A cross-encoder reads each (question, passage) pair as one input and
+    scores it, which is far more accurate and far too slow for the whole corpus.
+    So the cheap search casts a wide net and this picks the winners out of it.
+
+    Measured on the 31-question set: hit rate 93.5% → 100%, MRR 0.699 → 0.883.
+    The largest single retrieval gain recorded in this project.
+
+    Note what it cannot do: promote a passage the embedding search never
+    returned. Recall is still set by `rerank_depth`.
+    """
+    if len(passages) < 2:
+        return passages
+    model = _load_reranker()
+    scores = model.predict([(question, p.text) for p in passages])
+    ranked = sorted(zip(scores, range(len(passages))), key=lambda pair: -pair[0])
+    return [passages[index] for _, index in ranked]
 
 
 def main() -> int:
@@ -157,6 +206,13 @@ def main() -> int:
         return 0
 
     print(f'Question: {args.question}\n')
+    if settings.rerank:
+        # Say so, because the similarities below will not descend. They are the
+        # embedding scores that selected the candidates; the ORDER comes from
+        # the cross-encoder, which scores on a different scale entirely. Without
+        # this line an out-of-order list reads as a bug.
+        print(f"Reordered by {settings.rerank_model}")
+        print(f"(similarity below is the embedding score, not the ranking one)\n")
     for rank, hit in enumerate(hits, start=1):
         snippet = " ".join(hit.text.split())[:300]
         print(f"[{rank}] {hit.source_title} — p. {hit.cite_page}"

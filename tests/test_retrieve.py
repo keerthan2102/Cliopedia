@@ -22,11 +22,13 @@ from __future__ import annotations
 
 import re
 import shutil
+from pathlib import Path
 
 import pytest
 
 from cliopedia import ingest, retrieve
 from cliopedia.config import Settings
+from cliopedia.retrieve import Retrieved
 
 PASSAGES = [
     ("The Louisiana Purchase of 1803 nearly doubled the land area of the young "
@@ -221,3 +223,85 @@ def test_missing_index_raises_rather_than_returning_nothing(tmp_path, monkeypatc
     )
     with pytest.raises(retrieve.RetrievalError, match="No index"):
         retrieve.retrieve("anything", embeddings=_BagOfWords(["x"]))
+
+
+# ── Reranking ───────────────────────────────────────────────────────────────
+# A cross-encoder is a real model and far too slow for a unit test, so the
+# reordering contract is tested with a stub. What matters here is the wiring:
+# that reranking is off unless asked for, that it searches deeper than it
+# returns, and that it still hands back exactly `retrieval_k` passages.
+
+
+class _ReverseRanker:
+    """Stands in for the cross-encoder, scoring later passages higher.
+
+    Deliberately the exact opposite of the embedding order, so a test cannot
+    pass by accident when reranking silently does nothing.
+    """
+
+    def predict(self, pairs):
+        return list(range(len(pairs)))
+
+
+def test_reranking_is_off_by_default():
+    """The deployed footprint must not change until SPEC 2.2 is settled."""
+    from cliopedia.config import Settings
+
+    assert Settings(chroma_dir=Path("x"), embedding_model="toy", retrieval_k=4).rerank is False
+
+
+def test_rerank_reorders_by_the_model_not_by_similarity(monkeypatch):
+    from cliopedia import retrieve as retrieve_module
+
+    monkeypatch.setattr(retrieve_module, "_reranker", _ReverseRanker())
+    passages = [
+        Retrieved(text=f"passage {n}", similarity=1.0 - n / 10,
+                  source_title="B", source_type="secondary",
+                  locator_kind="page", locator_value=n, printed_page=n)
+        for n in range(4)
+    ]
+    reordered = retrieve_module.rerank("q", passages)
+    assert [p.locator_value for p in reordered] == [3, 2, 1, 0]
+
+
+def test_rerank_leaves_a_single_passage_alone(monkeypatch):
+    """Nothing to reorder, and no reason to load a model to discover that."""
+    from cliopedia import retrieve as retrieve_module
+
+    monkeypatch.setattr(retrieve_module, "_reranker", None)
+    one = [Retrieved(text="t", similarity=0.5, source_title="B",
+                     source_type="secondary", locator_kind="page",
+                     locator_value=1, printed_page=1)]
+    assert retrieve_module.rerank("q", one) == one
+    # The model must not have been loaded for a no-op.
+    assert retrieve_module._reranker is None
+
+
+def test_reranking_searches_deeper_than_it_returns(index, monkeypatch):
+    """The reranker can only promote what the search found — depth is recall."""
+    from cliopedia.config import Settings
+    from cliopedia import retrieve as retrieve_module
+
+    seen = {}
+    original = retrieve_module.open_index
+
+    def spy(embeddings=None):
+        store = original(embeddings)
+
+        class Watched:
+            def similarity_search_with_score(self, question, k):
+                seen["k"] = k
+                return store.similarity_search_with_score(question, k=k)
+
+        return Watched()
+
+    patched = Settings(chroma_dir=retrieve_module.settings.chroma_dir,
+                       embedding_model="toy", retrieval_k=2,
+                       rerank=True, rerank_depth=5)
+    monkeypatch.setattr(retrieve_module, "settings", patched)
+    monkeypatch.setattr(retrieve_module, "open_index", spy)
+    monkeypatch.setattr(retrieve_module, "_reranker", _ReverseRanker())
+
+    hits = retrieve_module.retrieve("Louisiana Purchase", embeddings=index)
+    assert seen["k"] == 5, "should search rerank_depth candidates"
+    assert len(hits) == 2, "but return only retrieval_k of them"

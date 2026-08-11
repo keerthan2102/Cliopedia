@@ -61,6 +61,11 @@ class Settings:
     chroma_dir: Path
     embedding_model: str
     retrieval_k: int
+    # Defaulted so that constructing a Settings for a test names only what the
+    # test cares about. The real values still come from _load_settings().
+    rerank: bool = False
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_depth: int = 20
 
 
 @dataclass(frozen=True)
@@ -101,6 +106,25 @@ def _positive_int(name: str, default: int) -> int:
     return value
 
 
+def _flag(name: str, default: bool = False) -> bool:
+    """A yes/no setting, forgiving about how a person writes it.
+
+    Refuses anything ambiguous rather than treating it as false. A typo silently
+    disabling a feature is the failure worth avoiding: the app keeps working,
+    slightly worse, and nothing says so.
+    """
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigError(
+        f"{name} must be true or false (or 1/0, yes/no, on/off), got {raw!r}."
+    )
+
+
 def _resolved_dir(name: str, default: str) -> Path:
     """Resolve a directory setting against the repo root, not the shell's cwd.
 
@@ -132,6 +156,30 @@ def _load_settings() -> Settings:
         # more passages past that buys no recall while giving the model more
         # unrelated text to blend in unattributed.
         retrieval_k=_positive_int("RETRIEVAL_K", 6),
+        # Reranking: retrieve a wider candidate pool with the embedding model,
+        # then re-score every candidate against the question with a
+        # cross-encoder and keep the best `retrieval_k`.
+        #
+        # Off by default, and the default is a deployment decision rather than a
+        # quality one. Measured on the 31-question set it is the largest gain in
+        # the project — hit rate 93.5% → 100%, MRR 0.699 → 0.883 — but it loads
+        # a second model, and `SPEC.md` §2.2 records that Streamlit Community
+        # Cloud's memory limits are unverified for even the first one. Turning
+        # this on locally costs nothing; turning it on in a deploy that has
+        # never been resource-tested is how a demo dies on its launch day.
+        # Revisit at P3, when deployment is actually exercised.
+        rerank=_flag("RERANK", False),
+        # A cross-encoder, not a bi-encoder. The embedding model encodes the
+        # question and the passage separately and compares the two vectors,
+        # which is what makes searching 9275 chunks cheap. A cross-encoder reads
+        # the pair together and scores it directly — far more accurate, far too
+        # slow to run over the whole corpus. Hence the two stages.
+        rerank_model=(os.getenv("RERANK_MODEL") or "").strip()
+        or "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        # How many candidates to re-score. 20 measured identically to 30 and 50
+        # (MRR 0.883 vs 0.882), so the cheapest depth wins: every extra
+        # candidate is another cross-encoder pass at query time.
+        rerank_depth=_positive_int("RERANK_DEPTH", 20),
     )
 
 
@@ -176,6 +224,11 @@ def main() -> int:
     print(f"                   exists: {settings.chroma_dir.exists()}")
     print(f"  EMBEDDING_MODEL  {settings.embedding_model}")
     print(f"  RETRIEVAL_K      {settings.retrieval_k}")
+    print(f"  RERANK           {'on' if settings.rerank else 'off'}")
+    if settings.rerank:
+        print(f"  RERANK_MODEL     {settings.rerank_model}")
+        print(f"  RERANK_DEPTH     {settings.rerank_depth}"
+              f"  (candidates re-scored, then the best {settings.retrieval_k} kept)")
 
     print("\nLLM settings (required — read on demand):")
     try:
