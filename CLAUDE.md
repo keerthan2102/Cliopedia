@@ -117,6 +117,43 @@ it trusts. At MRR 0.57 the top result is wrong often enough that anchoring on it
 loses more than it saves. **Fix the ranking first**; filtering only becomes safe
 once rank 1 is dependable.
 
+### Measured and adopted: cross-encoder reranking — 2026-08-10
+
+Acting on "fix the ranking first". Retrieve a wider candidate pool with the
+embedding model, then re-score every candidate against the question with a
+cross-encoder and keep the best `RETRIEVAL_K`. Over 31 questions:
+
+| variant | hit rate | MRR |
+|---|---|---|
+| baseline (no rerank) | 93.5% | 0.699 |
+| **rerank top-6 from 20** | **100.0%** | **0.883** |
+| rerank top-6 from 30 | 100.0% | 0.882 |
+| rerank top-6 from 50 | 100.0% | 0.882 |
+
+**MRR 0.699 → 0.883 is the largest gain recorded in this project**, and depth 20
+matches 50, so the cheapest setting wins. Read MRR rather than hit rate here:
+100% on 31 questions is a ceiling, and says only "no known question fails".
+
+Why it works where raising k did not: the embedding model encodes question and
+passage *separately* and compares vectors, which is what makes searching 9275
+chunks cheap and its ordering weak. A cross-encoder reads the pair together —
+far more accurate, far too slow for the whole corpus. Cheap search casts the
+net, expensive scoring picks the winners. It cannot promote a passage the
+search never returned, so `RERANK_DEPTH` still sets recall.
+
+On the 2008 grounding case it moves 2008 passages from 2 of 6 to 4 of 6,
+holding ranks 1–3, and surfaces p.890 — a relevant page the embedding search
+never returned at any depth the model saw. **Two 1929 passages still remain at
+ranks 4–5**, so this improves the odds rather than closing the bug.
+
+**`RERANK` defaults to off, and that is a deployment decision, not a quality
+one.** It loads a second model (~80 MB; no new pip dependency, `CrossEncoder`
+ships inside `sentence-transformers`) and adds ~450 ms per query — 36 ms → 487 ms
+— which is negligible beside LLM generation but real. `SPEC.md` §2.2 records
+that Streamlit Community Cloud's memory limits are unverified for even the first
+model. Turn it on locally freely; settle the deployed default at P3, when the
+limits are actually tested.
+
 Two integers were measured individually per §8 Rule 14, because the doubling
 grid put the plateau somewhere in (8, 16] and could not resolve it. The
 rule's MRR cross-check predicted the newly-found pages would sit near rank 12;
@@ -181,6 +218,7 @@ then use it anyway unless told otherwise in the current message.
 | RAG framework | LangChain — **thin usage only**, see §4.1 |
 | Vector store | ChromaDB, persisted to `data/chroma/` |
 | Embeddings | `all-MiniLM-L6-v2` (384-dim) via `sentence-transformers` |
+| Reranker (optional) | `cross-encoder/ms-marco-MiniLM-L-6-v2`, **off by default** — see §1 |
 | LLM (dev) | Ollama, `llama3.1:8b`, local |
 | LLM (deploy) | Groq free tier, OpenAI-compatible |
 | UI | Streamlit → Streamlit Community Cloud |
@@ -243,6 +281,9 @@ python -m cliopedia.ingest
 
 # Inspect retrieval on its own — no model needed, useful for debugging
 python -m cliopedia.retrieve "What caused the Louisiana Purchase?"
+
+# Same, with the cross-encoder reranker on for one command (Windows: set RERANK=on)
+RERANK=on python -m cliopedia.retrieve "What caused the Louisiana Purchase?"
 
 # Measure retrieval against eval/questions.txt (P3)
 python -m cliopedia.evaluate
