@@ -195,11 +195,26 @@ quality**. Compare within a book over time, not across books.
 not change. Adding items to a benchmark moves its aggregate for reasons that
 have nothing to do with the system, so track the per-book rows.
 
-**Still a floor, not a triumph.** Thirty questions means one item is worth 3.3
-points. The World History entries were written from `pypdf`-extracted text
-rather than the rendered page, and have not been spot-checked against the PDF
-by a human — worth doing, since Rule 13's lesson is that an unverified answer
-key is worth nothing.
+**The World History answer key is human-verified — 2026-08-10.** The entries
+were written from `pypdf`-extracted text rather than the rendered page, so five
+were spot-checked against the PDFs by the author: printed 61, 178 and 690 in
+Volume 1, and 85 and 534 in Volume 2 — both books, spread early to late. Each
+passed three checks: the folio typeset on the page matches the `pages:` value,
+the quoted sentence is present and intact rather than split across a caption,
+and the page genuinely answers the question.
+
+The folio check is the one that mattered most. It confirms the **offset of 10**
+on real rendered pages rather than on extracted text, and a wrong offset would
+have made every World History citation point at the wrong page. `_folio_offset`
+derived 10 automatically; a person has now seen it printed.
+
+Rule 13's lesson is that an unverified answer key is worth nothing, so this is
+what makes the World History rows above trustworthy rather than merely
+plausible.
+
+**Still a floor, not a triumph.** Thirty-one questions means one item is worth
+3.2 points, and the remaining ten World History entries are verified only by the
+extraction they were written from.
 
 Re-run `python -m cliopedia.evaluate --sweep` after any change to the corpus,
 the chunking, or the embedding model, and update this table.
