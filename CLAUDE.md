@@ -87,6 +87,36 @@ retrieval lands *adjacent* to the right passage and ranks its neighbours above
 it. Chunking, reranking over a wider candidate set, and hybrid keyword+vector
 search all move MRR. Raising k does not.
 
+### Measured and rejected: filtering retrieval by chapter — 2026-08-10
+
+Do not retry this without new evidence. It was proposed to fix a real grounding
+failure (a 2008 question answered partly from 1929 passages — see `prompts.py`),
+by dropping passages whose chapter differs from the top-ranked passage's.
+
+| variant | hit rate | MRR | passages/query |
+|---|---|---|---|
+| baseline k=6 | **93.5%** | **0.699** | 6.0 |
+| filtered from k=6 | 80.6% | 0.655 | 4.3 |
+| filtered from k=18, take 6 | 83.9% | 0.661 | 5.8 |
+
+**It fixes one question and breaks four** — the 1787 constitution, first European
+settlements, utopian socialism and Lend-Lease all stop working. Backfilling from
+a deeper pool recovers only one of them.
+
+The reason is the whole point: **when rank 1 is in the wrong chapter, anchoring
+on it entrenches the error** and deletes the gold page sitting deeper. For
+"What was the Lend-Lease Act?" the gold page is in chapter 13 of World History
+Volume 2 and rank 1 is not, so the correct passage is thrown away.
+
+Anchoring on the *majority* chapter is worse still, and was rejected before
+testing: in the 2008 case the majority is chapter 25 (four passages of six) —
+the **wrong** era. Filtering to it would delete both correct passages.
+
+The general lesson: a post-hoc filter cannot be more reliable than the ranking
+it trusts. At MRR 0.57 the top result is wrong often enough that anchoring on it
+loses more than it saves. **Fix the ranking first**; filtering only becomes safe
+once rank 1 is dependable.
+
 Two integers were measured individually per §8 Rule 14, because the doubling
 grid put the plateau somewhere in (8, 16] and could not resolve it. The
 rule's MRR cross-check predicted the newly-found pages would sit near rank 12;
