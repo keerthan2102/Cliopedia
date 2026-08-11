@@ -217,7 +217,16 @@ why: Read printed page 754: "During the 1930s, Americans had caught
 # volumes push the right U.S. History page out of the top k. They cannot
 # measure whether the new books are retrievable at all. These do.
 #
-# Offset for both volumes is 10, so PDF page 121 is printed page 111.
+# Offset for both volumes is 10, so PDF page 121 is printed page 111. That
+# offset was derived automatically by _folio_offset, then CONFIRMED by a human
+# reading the folio printed on real pages — see below.
+#
+# These were drafted from pypdf-extracted text rather than the rendered page,
+# which cannot show whether a figure caption sits between two quoted sentences.
+# Five were therefore spot-checked against the PDFs on 2026-08-10: printed 61,
+# 178 and 690 in Volume 1, and 85 and 534 in Volume 2. All five passed on the
+# folio, on the quoted sentence, and on whether the page answers the question.
+# The other ten are still only as good as the extraction.
 
 ask: Why did people at Çatalhöyük enter their houses through the roof?
 book: world-history-1
