@@ -104,6 +104,56 @@ def open_index(embeddings=None):
     )
 
 
+# How much deeper to search than we return, to leave room for deduplication.
+# Measured: at k=6, searching 12 yields six distinct pages on all 31 questions,
+# and searching 20 yields exactly the same result — so the extra depth buys
+# nothing and costs a wider similarity search on every query.
+DEDUP_SEARCH_FACTOR = 2
+
+
+def one_chunk_per_page(passages: list[Retrieved]) -> list[Retrieved]:
+    """Keep the best-ranked chunk from each page, dropping the rest.
+
+    Chunks are ~1000 characters and a textbook page holds several, so two or
+    three chunks from one page routinely rank together. Each copy consumed a
+    slot and prompt space while adding almost nothing: **k=6 was delivering 4.4
+    distinct pages of evidence, not 6.**
+
+    Measured over the 31-question set before adopting:
+
+        baseline                  hit 93.5%  MRR 0.724  4.4 distinct pages
+        deduplicated from k=12    hit 93.5%  MRR 0.729  6.0 distinct pages
+
+    No question breaks, MRR improves slightly, and the model receives 36% more
+    actual evidence for the same prompt budget.
+
+    The second reason matters more than the efficiency. Duplicate pages caused a
+    real citation failure: with four of six passages from p.896, the model cited
+    `[1]` for "Lehman Brothers was completely wiped out in September 2008" when
+    that text is in `[2]`. Both cards read "p. 896", so the page a reader sees
+    is right — but expanding `[1]` shows a snippet that does not contain the
+    claim, and a source card that does not support its sentence is the failure
+    this project exists to prevent. Four near-identical indices are what made
+    them interchangeable; one page, one index removes the confusion by
+    construction rather than instructing the model around it.
+
+    What is given up, stated plainly: a page with two relevant passages in
+    different places now shows the reader only the better-matching one. They
+    still have the page number. Against that, the previous behaviour showed two
+    separate source cards both labelled "p. 896", which is worse for a reader,
+    not better.
+    """
+    seen: set[tuple[str, int]] = set()
+    kept = []
+    for passage in passages:
+        page = (passage.source_title, passage.cite_page)
+        if page in seen:
+            continue
+        seen.add(page)
+        kept.append(passage)
+    return kept
+
+
 def retrieve(question: str, k: int | None = None, embeddings=None) -> list[Retrieved]:
     """Return the `k` passages closest in meaning to `question`.
 
@@ -117,10 +167,18 @@ def retrieve(question: str, k: int | None = None, embeddings=None) -> list[Retri
 
     k = k or settings.retrieval_k
     store = open_index(embeddings)
-    # With reranking on, search wider than we intend to return: the cross-encoder
-    # can only promote a passage the embedding search actually found. Depth is
-    # where the recall comes from; the reranker supplies the ordering.
-    depth = max(k, settings.rerank_depth) if settings.rerank else k
+    # Search wider than we intend to return, for two reasons that compound.
+    #
+    # Deduplication discards chunks whose page is already represented, so the
+    # shortfall has to be made up from deeper results — searching exactly k and
+    # then deduplicating would return fewer than k passages.
+    #
+    # Reranking needs depth for a different reason: the cross-encoder can only
+    # promote a passage the embedding search actually found, so depth is where
+    # recall comes from and the reranker only supplies the ordering.
+    depth = k * DEDUP_SEARCH_FACTOR
+    if settings.rerank:
+        depth = max(depth, settings.rerank_depth)
     hits = store.similarity_search_with_score(question, k=depth)
 
     results = []
@@ -143,7 +201,10 @@ def retrieve(question: str, k: int | None = None, embeddings=None) -> list[Retri
         )
     if settings.rerank:
         results = rerank(question, results)
-    return results[:k]
+    # Deduplicate AFTER reranking, so the chunk kept for each page is the one
+    # the best available ranker put highest, not merely the first the embedding
+    # search happened to return.
+    return one_chunk_per_page(results)[:k]
 
 
 _reranker = None
