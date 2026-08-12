@@ -189,6 +189,19 @@ def uncited_sentences(answer: str) -> list[str]:
     return out
 
 
+def _chapter_number(heading: str) -> str:
+    """The chapter a heading belongs to, ignoring its section.
+
+    "32.2 The Domestic Mission" is part of chapter 32. Comparing the full
+    "32.2" against "32" reported every run as citing outside its anchor
+    chapter — 10/10, which is noise rather than signal. Only the integer part
+    separates 2008 material from 1929 material here.
+    """
+    if not heading.strip():
+        return "?"
+    return heading.split()[0].split(".")[0]
+
+
 def _report(runs: list[tuple[str, list[Claim], list[str]]],
             passages: Sequence[Retrieved]) -> None:
     """Lay the runs out for a person. Deliberately reaches no verdict."""
@@ -223,7 +236,10 @@ def _report(runs: list[tuple[str, list[Claim], list[str]]],
     print("  CHAPTER SPREAD PER RUN — every marker, not only best-scoring ones")
     print("  A run citing two chapters is not automatically wrong: a framed")
     print("  comparison is legitimate. It is where to look, not a verdict.\n")
-    chapters = {n: (p.heading or "?").split()[0] for n, p in enumerate(passages, 1)}
+    # The CHAPTER, not the section: "32.2 The Domestic Mission" is part of
+    # chapter 32, so comparing the full "32.2" against "32" reported every run
+    # as citing outside its anchor chapter — 10/10, which is noise, not signal.
+    chapters = {n: _chapter_number(p.heading or "") for n, p in enumerate(passages, 1)}
     anchor = chapters.get(1)
     for index, (text, _, _) in enumerate(runs, 1):
         cited = sorted(all_citations(text))
