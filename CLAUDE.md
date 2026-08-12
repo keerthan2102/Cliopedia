@@ -305,6 +305,11 @@ python -m cliopedia.evaluate
 python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,6,8,16
 python -m cliopedia.evaluate -k 5           # one specific k
 
+# Sample the SAME question several times and lay out what each answer cited.
+# Generation is stochastic, so one answer proves nothing either way. Needs Ollama.
+python -m cliopedia.grounding "What happened during the 2008 financial crisis?"
+python -m cliopedia.grounding "..." --runs 10 --show
+
 # Ask a question from the terminal (P0)
 python -m cliopedia.ask "What caused the Louisiana Purchase?"
 python -m cliopedia.ask "..." --snippets    # show the verbatim passages
