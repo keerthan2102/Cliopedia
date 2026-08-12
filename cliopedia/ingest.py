@@ -257,7 +257,41 @@ def _heading(page_text: str) -> str | None:
     return None
 
 
-def load_pages(pdf: Path) -> tuple[list, int | None]:
+# Sections that are apparatus rather than history: the glossary, the review
+# questions, the end-of-chapter assessments. See `_is_back_matter`.
+_BACK_MATTER = re.compile(
+    r"\b(key terms|summary|review questions|critical thinking|answer key|index|"
+    r"references|suggested reading|assessments|further research|"
+    r"test your understanding)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_back_matter(heading: str) -> bool:
+    """Whether a page is chapter apparatus rather than the history itself.
+
+    These pages retrieve *well* and answer *badly*, which is the worst
+    combination. An assessments page is a list of questions, so it matches a
+    student's question closely while containing no answer at all. A key-terms
+    page is a dense run of decontextualised definitions — and it was the direct
+    cause of a real grounding failure: asked about the 2008 crisis, the app
+    repeatedly cited U.S. History p.699 ("25 Key Terms") for "the market losing
+    close to 40 percent of its value", which is Black Tuesday 1929. That page
+    ranks highly because a glossary is nothing but keywords.
+
+    Measured before adopting, over the 31-question set: hit rate unchanged at
+    93.5%, MRR 0.699 → 0.724, and **no gold page anywhere in the eval set sits
+    in a back-matter section**, so nothing is lost that anything asks for.
+
+    The cost, stated plainly: a key-terms page does hold real definitions, and
+    dropping it means a question best answered by a glossary entry cannot be.
+    That is accepted — this corpus is prose, the definitions are restated in the
+    body text, and the measurement says the exchange is free.
+    """
+    return bool(_BACK_MATTER.search(heading))
+
+
+def load_pages(pdf: Path) -> tuple[list, int | None, int]:
     """Read a PDF into one Document per page, using pypdf directly.
 
     LangChain's PyPDFLoader used to do this. It was dropped because
@@ -274,15 +308,21 @@ def load_pages(pdf: Path) -> tuple[list, int | None]:
     texts = [(page.extract_text() or "") for page in reader.pages]
     offset = _folio_offset(texts)
 
-    pages = [
-        Document(
-            page_content=text,
-            metadata={"page_index": index, "heading": _heading(text) or ""},
+    # The offset above is computed from EVERY page, before anything is dropped —
+    # back-matter pages carry folios like any other and are useful votes.
+    pages = []
+    skipped = 0
+    for index, text in enumerate(texts, start=1):
+        if not text.strip():
+            continue  # image-only pages carry no retrievable text
+        heading = _heading(text) or ""
+        if _is_back_matter(heading):
+            skipped += 1
+            continue
+        pages.append(
+            Document(page_content=text, metadata={"page_index": index, "heading": heading})
         )
-        for index, text in enumerate(texts, start=1)
-        if text.strip()  # image-only pages carry no retrievable text
-    ]
-    return pages, offset
+    return pages, offset, skipped
 
 
 def load_and_split(pdf_paths: Iterable[Path]) -> list:
@@ -312,11 +352,13 @@ def load_and_split(pdf_paths: Iterable[Path]) -> list:
     chunks: list = []
     for pdf in pdf_paths:
         title, source_type = _describe(pdf)
-        pages, offset = load_pages(pdf)
-        if offset is None:
-            print(f"  {pdf.name}: {len(pages)} text pages, printed numbering not established")
-        else:
-            print(f"  {pdf.name}: {len(pages)} text pages, printed page = PDF page - {offset}")
+        pages, offset, skipped = load_pages(pdf)
+        numbering = ("printed numbering not established" if offset is None
+                     else f"printed page = PDF page - {offset}")
+        print(f"  {pdf.name}: {len(pages)} text pages, {numbering}")
+        if skipped:
+            print(f"      {skipped} back-matter page(s) skipped "
+                  f"(glossary, assessments, review questions)")
 
         for chunk in splitter.split_documents(pages):
             pdf_page = chunk.metadata["page_index"]
