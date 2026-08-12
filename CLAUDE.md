@@ -25,7 +25,7 @@ tradeoff: clarity over cleverness, explainability over brevity.
 
 **Status: P0 proven end to end** — a real question returns a grounded answer
 citing printed page numbers, running locally against Ollama `llama3.1:8b`
-over **9275 chunks** across all three OpenStax books. **P1 (Streamlit UI) is
+over **8330 chunks** across all three OpenStax books. **P1 (Streamlit UI) is
 built but not yet exercised by a human.** P2 is next.
 
 ### Retrieval baseline — three books, measured 2026-08-10
@@ -116,6 +116,49 @@ The general lesson: a post-hoc filter cannot be more reliable than the ranking
 it trusts. At MRR 0.57 the top result is wrong often enough that anchoring on it
 loses more than it saves. **Fix the ranking first**; filtering only becomes safe
 once rank 1 is dependable.
+
+### Grounding, sampled over 10 runs — measured 2026-08-11
+
+Retrieval hit rate says nothing about whether the ANSWER is supported. Measured
+separately with `python -m cliopedia.grounding`, ten samples of "What happened
+during the 2008 financial crisis?" per configuration, counting runs that cited a
+Great Depression passage for a question about 2008:
+
+| configuration | runs citing 1929 material | uncited factual sentences |
+|---|---|---|
+| baseline | **9/10** | 47 |
+| + reranking | 2/10 | 33 |
+| + back-matter excluded | **0/10** | 31 |
+
+**The era-merging failure is gone in the current configuration.** A 1929 passage
+still sits in the candidate set at rank 5 and was not cited once in ten runs.
+Note what fixed it: not the prompt. Two prompt rules were written for this and
+neither closed it. What worked was **giving the model less wrong material** —
+reranking promotes the right pages, back-matter exclusion removes the glossary
+page that kept surfacing. Structural beats instructional.
+
+**Sample, never take one run as an answer.** Two runs on identical code and
+config produced one clean answer and one with a false claim. Every conclusion
+above rests on ten samples; earlier conclusions in this project rested on one
+and two of them were wrong.
+
+#### Two failures remain, both open
+
+**Uncited claims — 31 per 10 runs, essentially untouched by everything so far.**
+Real content with no marker at all: "A pyramid scheme organized by Bernard
+Madoff defrauded his investors by at least $18 billion" is on p.896 and carries
+no citation. Prompt rule 4 requires one. The app shows no source card for these,
+so they are precisely what a reader cannot check.
+
+**Wrong-chunk citation — new, and caused by duplicate pages.** The model cited
+`[1]` for "Lehman Brothers was completely wiped out in September 2008" when that
+text is in `[2]`. Both are p.896, so the page a reader SEES is right — but
+expanding card `[1]` shows a snippet that does not contain the claim.
+
+Four of six passages were p.896. That is the 23% duplicate-slot waste recorded
+above, now doing visible damage: when four indices point at one page, the model
+stops distinguishing them. **This is a second, independent argument for
+page-level deduplication**, which until now was only an efficiency question.
 
 ### Measured and adopted: cross-encoder reranking — 2026-08-10
 
