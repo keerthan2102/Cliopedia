@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from cliopedia.grounding import (
     REVIEW_FIRST_BELOW,
+    all_citations,
     check,
     content_words,
     uncited_sentences,
@@ -154,3 +155,34 @@ def test_a_short_linking_sentence_is_not_surfaced():
 
 def test_a_cited_sentence_is_not_reported_as_uncited():
     assert uncited_sentences("Millions defaulted on their loans [1].") == []
+
+
+# ── all_citations ───────────────────────────────────────────────────────────
+# check() reports only a sentence's BEST-matching citation, which is right for
+# ranking what to read and wrong for tallying what an answer touched. A run
+# summary built from Claim.citation showed "cites [1, 2, 4]" for an answer that
+# also cited [3], a Great Depression passage — undercounting the one number the
+# grounding investigation turned on, in the reassuring direction.
+
+
+def test_every_marker_is_reported_not_only_the_best_scoring_one():
+    assert all_citations("A claim [1] and another [3][4]. A third [1].") == [1, 3, 4]
+
+
+def test_citations_are_listed_in_order_of_first_use():
+    assert all_citations("First [5]. Then [2]. Then [5] again.") == [5, 2]
+
+
+def test_an_answer_with_no_markers_lists_nothing():
+    assert all_citations("No citations at all here.") == []
+
+
+def test_check_and_all_citations_can_legitimately_disagree():
+    """The bug in one sentence: check() keeps [2], the tally must keep both."""
+    passages = [
+        passage("wholly unrelated Neolithic text", 1),
+        passage("Congress created the Troubled Asset Relief Program", 2),
+    ]
+    answer = "Congress created the Troubled Asset Relief Program [1][2]."
+    assert [c.citation for c in check(answer, passages)] == [2]
+    assert all_citations(answer) == [1, 2]

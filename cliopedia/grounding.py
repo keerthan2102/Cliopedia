@@ -154,6 +154,26 @@ def check(answer: str, passages: Sequence[Retrieved]) -> list[Claim]:
     return claims
 
 
+def all_citations(answer: str) -> list[int]:
+    """Every passage number the answer cites, in order of first use.
+
+    Separate from `check()` on purpose. `check()` scores a sentence against its
+    BEST-matching citation and reports only that one, which is right for
+    ranking what to read — but it means a sentence citing [3][4] disappears from
+    any tally built from `Claim.citation`.
+
+    That mattered: a run summary built that way showed "cites [1, 2, 4]" for an
+    answer that also cited [3], a Great Depression passage. The one number the
+    whole grounding investigation turned on was undercounting, and undercounting
+    in the reassuring direction. Which passages an answer touched is a question
+    about the raw markers, so it is answered from the raw markers.
+    """
+    seen: dict[int, None] = {}
+    for match in _MARKER.finditer(answer):
+        seen.setdefault(int(match.group(1)), None)
+    return list(seen)
+
+
 def uncited_sentences(answer: str) -> list[str]:
     """Sentences making a claim with no citation at all.
 
@@ -198,6 +218,21 @@ def _report(runs: list[tuple[str, list[Claim], list[str]]],
         if claim.missing:
             print(f"      not in that passage: {', '.join(claim.missing[:8])}")
         print()
+
+    print("=" * 78)
+    print("  CHAPTER SPREAD PER RUN — every marker, not only best-scoring ones")
+    print("  A run citing two chapters is not automatically wrong: a framed")
+    print("  comparison is legitimate. It is where to look, not a verdict.\n")
+    chapters = {n: (p.heading or "?").split()[0] for n, p in enumerate(passages, 1)}
+    anchor = chapters.get(1)
+    for index, (text, _, _) in enumerate(runs, 1):
+        cited = sorted(all_citations(text))
+        other = [n for n in cited if chapters.get(n) != anchor and n in chapters]
+        note = f"  <-- also cites chapter(s) {sorted({chapters[n] for n in other})}" if other else ""
+        print(f"    run {index}: {cited}{note}")
+    mixed = sum(1 for text, _, _ in runs
+                if any(chapters.get(n) != anchor for n in all_citations(text) if n in chapters))
+    print(f"\n    {mixed}/{len(runs)} runs cited a passage outside chapter {anchor}\n")
 
     uncited = [(text, index) for index, (_, _, texts) in enumerate(runs, 1) for text in texts]
     if uncited:
@@ -246,7 +281,7 @@ def main() -> int:
             runs.append((text, [], []))
             continue
         claims = check(text, passages)
-        cited = sorted({claim.citation for claim in claims})
+        cited = sorted(all_citations(text))
         low = sum(1 for claim in claims if claim.worth_reading)
         print(f"  run {index}: cites {cited}, {low} sentence(s) worth checking")
         if args.show:
