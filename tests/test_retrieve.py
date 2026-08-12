@@ -305,3 +305,80 @@ def test_reranking_searches_deeper_than_it_returns(index, monkeypatch):
     hits = retrieve_module.retrieve("Louisiana Purchase", embeddings=index)
     assert seen["k"] == 5, "should search rerank_depth candidates"
     assert len(hits) == 2, "but return only retrieval_k of them"
+
+
+# ── Page-level deduplication ────────────────────────────────────────────────
+# Chunks are ~1000 chars and a page holds several, so two or three from one page
+# routinely rank together. Each duplicate consumed a slot: k=6 was delivering
+# 4.4 distinct pages, not 6. It also caused a real citation failure — with four
+# of six passages from p.896 the model cited [1] for text that was in [2].
+
+
+def _p(page: int, text: str = "text", book: str = "OpenStax U.S. History") -> Retrieved:
+    return Retrieved(
+        text=text, similarity=0.9, source_title=book, source_type="secondary",
+        locator_kind="page", locator_value=page + 16, printed_page=page,
+    )
+
+
+def test_duplicate_pages_collapse_to_the_first():
+    """The FIRST is kept, because by then it is the best-ranked one."""
+    kept = retrieve.one_chunk_per_page(
+        [_p(896, "first"), _p(896, "second"), _p(890), _p(896, "third")]
+    )
+    assert [p.printed_page for p in kept] == [896, 890]
+    assert kept[0].text == "first"
+
+
+def test_the_same_page_number_in_different_books_is_not_a_duplicate():
+    """Every volume has a page 210 — Rule 15's lesson, applied here too."""
+    kept = retrieve.one_chunk_per_page([
+        _p(210, book="OpenStax U.S. History"),
+        _p(210, book="OpenStax World History Volume 1, to 1500"),
+    ])
+    assert len(kept) == 2
+
+
+def test_passages_already_distinct_are_returned_unchanged():
+    passages = [_p(896), _p(890), _p(680)]
+    assert retrieve.one_chunk_per_page(passages) == passages
+
+
+def test_deduplication_preserves_rank_order():
+    """Order is the ranker's judgement and must survive the filter."""
+    kept = retrieve.one_chunk_per_page([_p(3), _p(1), _p(3), _p(2)])
+    assert [p.printed_page for p in kept] == [3, 1, 2]
+
+
+def test_retrieve_searches_deeper_than_k_to_leave_room_for_dedup(index, monkeypatch):
+    """Searching exactly k then deduplicating would return fewer than k."""
+    from cliopedia.config import Settings
+    from cliopedia import retrieve as retrieve_module
+
+    seen = {}
+    original = retrieve_module.open_index
+
+    def spy(embeddings=None):
+        store = original(embeddings)
+
+        class Watched:
+            def similarity_search_with_score(self, question, k):
+                seen["k"] = k
+                return store.similarity_search_with_score(question, k=k)
+
+        return Watched()
+
+    patched = Settings(chroma_dir=retrieve_module.settings.chroma_dir,
+                       embedding_model="toy", retrieval_k=3)
+    monkeypatch.setattr(retrieve_module, "settings", patched)
+    monkeypatch.setattr(retrieve_module, "open_index", spy)
+
+    retrieve_module.retrieve("Louisiana Purchase", embeddings=index)
+    assert seen["k"] == 3 * retrieve_module.DEDUP_SEARCH_FACTOR
+
+
+def test_every_returned_passage_is_a_different_page(index):
+    """The property that matters, end to end against a real index."""
+    hits = retrieve.retrieve("Louisiana Purchase", k=4, embeddings=index)
+    pages = [(h.source_title, h.cite_page) for h in hits]
+    assert len(pages) == len(set(pages))
