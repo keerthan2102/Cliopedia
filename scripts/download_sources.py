@@ -415,8 +415,13 @@ def main() -> int:
 
     _report_pending(corpus.pending())
 
+    # Count what is on disk, not what this run happened to process. `--book X`
+    # processes one book, so len(books) was always 1 and the line read "1 of 3
+    # present" with two books sitting there — a summary that describes the run
+    # while claiming to describe the directory.
+    present = sum(1 for entry in corpus.CORPUS if (RAW_DIR / entry.filename).exists())
     print(
-        f"\n{len(books)} of {len(corpus.CORPUS)} registered book(s) present in data/raw/."
+        f"\n{present} of {len(corpus.CORPUS)} registered book(s) present in data/raw/."
         "\nNext: python -m cliopedia.ingest --rebuild"
     )
     return 0
