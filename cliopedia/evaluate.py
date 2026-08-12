@@ -13,7 +13,7 @@ reciprocal rank), which rewards putting the right page first rather than fourth
 for prompt space with three irrelevant ones.
 
     python -m cliopedia.evaluate
-    python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,8,16
+    python -m cliopedia.evaluate --sweep        # hit rate at k = 1,2,4,6,8,16
 
 The question set lives in eval/questions.txt, hand-written and version
 controlled. Scoring lives here, in the package, so it can be imported and
