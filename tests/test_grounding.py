@@ -186,3 +186,18 @@ def test_check_and_all_citations_can_legitimately_disagree():
     answer = "Congress created the Troubled Asset Relief Program [1][2]."
     assert [c.citation for c in check(answer, passages)] == [2]
     assert all_citations(answer) == [1, 2]
+
+
+def test_a_subsection_belongs_to_its_chapter():
+    """'32.2 The Domestic Mission' is chapter 32, not a different chapter.
+
+    Comparing the full section string reported 10/10 runs as citing outside
+    their anchor chapter, which is noise. Only the integer part identifies the
+    chapter, and that is what distinguishes 2008 material from 1929 material.
+    """
+    from cliopedia.grounding import _chapter_number
+
+    assert _chapter_number("32.2 The Domestic Mission") == "32"
+    assert _chapter_number("32 The Challenges of the Twenty-First Century") == "32"
+    assert _chapter_number("25.1 The Stock Market Crash of 1929") == "25"
+    assert _chapter_number("") == "?"
