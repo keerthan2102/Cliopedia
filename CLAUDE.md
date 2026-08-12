@@ -142,6 +142,34 @@ config produced one clean answer and one with a false claim. Every conclusion
 above rests on ten samples; earlier conclusions in this project rested on one
 and two of them were wrong.
 
+#### Prompt instructions do not fix grounding here — three attempts, 2026-08-11
+
+| attempt | target | result |
+|---|---|---|
+| rule 3, "never combine separate events" | era-merging | **no effect** — the quoted chunk had no dates to check against |
+| chapter labels on each passage | era-merging | partial — model saw them, then bridged the eras anyway |
+| rule 4, "a citation per sentence" | uncited claims | **no effect** — 21 per 10 runs, inside the 17–22 band already seen without it |
+
+Every structural change moved the number instead:
+
+| change | effect |
+|---|---|
+| cross-encoder reranking | era-merging 9/10 → 2/10 |
+| back-matter excluded from the index | era-merging → 0/10 |
+| one chunk per page | uncited claims 31 → 17–22 |
+
+**The pattern is consistent enough to plan around: giving the model less wrong
+material works, telling it to behave better does not.** Both prompt rules are
+kept — they cost nothing and may help a stronger deployed model — but do not
+expect a prompt edit to move a measured grounding number on `llama3.1:8b`, and
+do not ship one claiming it will.
+
+The remaining defect follows from this. Uncited factual sentences sit at ~20 per
+10 runs and no instruction has shifted them, so the fix belongs in code: detect
+sentences that state a fact and carry no marker, and surface them in the UI as
+unverified rather than trusting the model to prevent them. `cliopedia/grounding.py`
+already implements the detection (`uncited_sentences`).
+
 #### Two failures remain, both open
 
 **Uncited claims — 31 per 10 runs, essentially untouched by everything so far.**
