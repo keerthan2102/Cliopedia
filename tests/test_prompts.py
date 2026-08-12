@@ -325,3 +325,23 @@ def test_prompt_reserves_the_refusal_sentence_for_total_refusals():
     """Rule 6 must not invite the model to use rule 2's sentence while answering."""
     assert "reserved" in prompts.SYSTEM_PROMPT
     assert "Do NOT use the sentence from rule 2" in prompts.SYSTEM_PROMPT
+
+
+def test_the_prompt_demands_a_citation_per_sentence_not_per_paragraph():
+    """Rule 4 was already explicit and still produced 17 uncited sentences per
+    10 runs. The failure was specific: the model cited the first sentence of a
+    thought and let the rest run on, treating one marker as covering the
+    paragraph. That is ordinary academic style and wrong here — the app renders
+    one source card per marker, so an uncited sentence gets no card and is
+    indistinguishable on screen from an invention.
+    """
+    system = prompts.SYSTEM_PROMPT
+    assert "Every sentence that states a fact carries its own marker" in system
+    assert "not the paragraph" in system
+    # The worked example must actually demonstrate the repetition it asks for.
+    assert system.count("[1].") >= 3
+
+
+def test_the_prompt_still_exempts_sentences_carrying_no_claim():
+    """Otherwise the model would decorate linking phrases with citations."""
+    assert "If a sentence states no fact" in prompts.SYSTEM_PROMPT

@@ -75,6 +75,27 @@ square brackets, immediately after the claim. Example:
 The purchase doubled the size of the United States [2].
 A sentence drawn from two passages carries both: ... [1][3].
 
+**Every sentence that states a fact carries its own marker**, including one \
+continuing the point before it. A citation covers the sentence it sits in and \
+nothing further — not the paragraph, not the idea. So consecutive sentences \
+drawn from the same passage each end in the same number:
+
+Millions defaulted on adjustable-rate loans [1]. Without access to credit, \
+consumer spending declined [1]. International trade slowed, hurting many \
+American businesses [1].
+
+That repetition is correct, not clumsy. Do NOT write the first sentence with a \
+citation and let the rest of the paragraph run on without one — that is the \
+most common way this goes wrong, and it is invisible to you and fatal to the \
+reader: the application renders one source card per marker, so a sentence \
+without a marker gets no card and there is nothing for a student to check it \
+against. An uncited sentence is indistinguishable, on screen, from something \
+you invented.
+
+If a sentence states no fact — a linking phrase, a summary of what you just \
+said — it needs no citation. If you cannot point to the passage a sentence \
+came from, do not write the sentence.
+
 5. Never cite a passage number you were not given. Never invent page numbers — \
 cite passage numbers only, and the application will turn those into pages.
 
